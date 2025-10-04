@@ -1,82 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mike's Profile - Mikesta</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mikesta — Mike's Profile & Feed</title>
+
+  <!-- Keep the one you actually have; remove the other -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Icons used by the feed UI -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
 <body>
-    <div class="container">
-        <header class="profile-header">
-            <div class="profile-image">
-                <img src="https://via.placeholder.com/150" alt="Mike's Profile Picture">
-            </div>
-            <div class="profile-info">
-                <h1>Mike</h1>
-                <p class="tagline">Developer | Creator | Problem Solver</p>
-            </div>
-        </header>
-
-        <main class="profile-content">
-            <section class="about-section">
-                <h2>About Me</h2>
-                <p>
-                    Welcome to my profile page! I'm Mike, a passionate developer who loves creating
-                    innovative solutions and building amazing projects. This is my personal space
-                    on Mikesta where I share my journey and experiences.
-                </p>
-            </section>
-
-            <section class="skills-section">
-                <h2>Skills & Expertise</h2>
-                <div class="skills-grid">
-                    <div class="skill-item">
-                        <h3>Web Development</h3>
-                        <p>HTML, CSS, JavaScript</p>
-                    </div>
-                    <div class="skill-item">
-                        <h3>Programming</h3>
-                        <p>Python, Java, C++</p>
-                    </div>
-                    <div class="skill-item">
-                        <h3>Problem Solving</h3>
-                        <p>Algorithms & Data Structures</p>
-                    </div>
-                    <div class="skill-item">
-                        <h3>Collaboration</h3>
-                        <p>Git, Team Projects</p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="projects-section">
-                <h2>Featured Projects</h2>
-                <div class="projects-grid">
-                    <div class="project-item">
-                        <h3>Mikesta Platform</h3>
-                        <p>A personal profile platform for showcasing skills and projects.</p>
-                    </div>
-                    <div class="project-item">
-                        <h3>Coming Soon</h3>
-                        <p>More exciting projects on the way!</p>
-                    </div>
-                </div>
-            </section>
-
-            <section class="contact-section">
-                <h2>Get In Touch</h2>
-                <p>Feel free to reach out and connect!</p>
-                <div class="contact-links">
-                    <a href="https://github.com/MikeandIkeBeans" target="_blank">GitHub</a>
-                    <a href="mailto:mike@example.com">Email</a>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>&copy; 2024 Mikesta - Mike's Profile Page</p>
-        </footer>
+  <!-- Navigation Header (from main) -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="logo">
+        <i class="fas fa-camera"></i>
+        <h1>Mikesta</h1>
+      </div>
+      <div class="search-bar">
+        <i class="fas fa-search"></i>
+        <input type="text" placeholder="Search" />
+      </div>
+      <div class="nav-icons">
+        <button class="nav-btn" id="uploadBtn" title="Upload Photo">
+          <i class="fas fa-plus-square"></i>
+        </button>
+        <button class="nav-btn" title="Explore">
+          <i class="fas fa-compass"></i>
+        </button>
+        <button class="nav-btn" title="Notifications">
+          <i class="fas fa-heart"></i>
+        </button>
+        <button class="nav-btn" title="Profile">
+          <i class="fas fa-user-circle"></i>
+        </button>
+      </div>
     </div>
-</body>
-</html>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main-container">
+    <!-- Mike's Profile (from copilot/fix… branch) -->
+    <section class="profile-header container">
+      <div class="profile-image">
+        <img src="https://via.placeholder.com/150" alt="Mike's Profile Picture" />
+      </div>
+      <div class="profile-info">
+        <h1>Mike</h1>
+        <p class="tagline">Developer | Creator | Problem Solver</p>
+      </div>
+    </section>
+
+    <section class="profile-content container">
+      <section class="about-section">
+        <h2>About Me</h2>
+        <p>
+          Welcome to my profile page! I'm Mike, a passionate developer who loves creating
+          innovative solutions and building amazing projects. This is my personal space
+          on Mikesta where I share my journey and experiences.
+        </p>
+      </section>
+
+      <section class="skills-section">
+        <h2>Skills &amp; Expertise</h2>
+        <div class="skills-grid">
+          <div class="skill-item">
+            <h3>Web Development</h3>
+            <p>HTML, CSS, JavaScript</p>
+          </div>
+          <div class="skill-item">
+            <h3>Programming</h3>
+            <p>Python, Java, C++</p>
+          </div>
+          <div class="skill-item">
+            <h3>Problem Solving</h3>
+            <p>Algorithms &amp; Data Structures</p>
+          </div>
+          <div class="skill-item">
+            <h3>Collaboration</h3>
+            <p>Git, Team Projects</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="projects-section">
+        <h2>Featured Projects</h2>
+        <div class="projects-grid">
+          <div class="project-item">
+            <h3>Mikesta Platform</h3>
+            <p>A personal profile platform for showcasing skills and projects.</p>
+          </div>
+          <div class="project-item">
+            <h3>Coming Soon</h3>
+            <p>More exciting projects on the way!</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="contact-section">
+        <h2>Get In Touch</h2>
+        <p>Feel free to reach out and connect!</p>
+        <div class="contact-links">
+          <a href="https://github.com/MikeandIkeBeans" target="_blank" rel="noopener">GitHub</a>
+          <a href="mailto:mike@example.com">Email</a>
+        </div>
+      </section>
+    </section>
+
+    <!-- Stories Section (from main) -->
+    <section class="stories-section">
+      <div class="stories-container">
+        <div class="story-item">
+          <div class="story-ring">
+            <img src="https://i.pravatar.cc/150?img=1" alt="User 1" />
+          </div>
+          <span>user_one</span>
+        </div>
