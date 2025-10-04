@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mikesta - Share Your Moments</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation Header -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-camera"></i>
+                <h1>Mikesta</h1>
+            </div>
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search">
+            </div>
+            <div class="nav-icons">
+                <button class="nav-btn" id="uploadBtn" title="Upload Photo">
+                    <i class="fas fa-plus-square"></i>
+                </button>
+                <button class="nav-btn" title="Explore">
+                    <i class="fas fa-compass"></i>
+                </button>
+                <button class="nav-btn" title="Notifications">
+                    <i class="fas fa-heart"></i>
+                </button>
+                <button class="nav-btn" title="Profile">
+                    <i class="fas fa-user-circle"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Stories Section -->
+        <section class="stories-section">
+            <div class="stories-container">
+                <div class="story-item">
+                    <div class="story-ring">
+                        <img src="https://i.pravatar.cc/150?img=1" alt="User 1">
+                    </div>
+                    <span>user_one</span>
+                </div>
+                <div class="story-item">
+                    <div class="story-ring">
+                        <img src="https://i.pravatar.cc/150?img=2" alt="User 2">
+                    </div>
+                    <span>travel_girl</span>
+                </div>
+                <div class="story-item">
+                    <div class="story-ring">
+                        <img src="https://i.pravatar.cc/150?img=3" alt="User 3">
+                    </div>
+                    <span>foodie_mike</span>
+                </div>
+                <div class="story-item">
+                    <div class="story-ring">
+                        <img src="https://i.pravatar.cc/150?img=4" alt="User 4">
+                    </div>
+                    <span>photo_pro</span>
+                </div>
+                <div class="story-item">
+                    <div class="story-ring">
+                        <img src="https://i.pravatar.cc/150?img=5" alt="User 5">
+                    </div>
+                    <span>adventure</span>
+                </div>
+                <div class="story-item">
+                    <div class="story-ring">
+                        <img src="https://i.pravatar.cc/150?img=6" alt="User 6">
+                    </div>
+                    <span>nature_ike</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feed Section -->
+        <section class="feed-section">
+            <!-- Post 1 -->
+            <article class="post-card">
+                <div class="post-header">
+                    <div class="user-info">
+                        <img src="https://i.pravatar.cc/150?img=7" alt="User" class="user-avatar">
+                        <div class="user-details">
+                            <span class="username">mike_photos</span>
+                            <span class="location">New York, NY</span>
+                        </div>
+                    </div>
+                    <button class="post-options">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                </div>
+                <div class="post-image">
+                    <img src="https://picsum.photos/600/600?random=1" alt="Post">
+                </div>
+                <div class="post-actions">
+                    <div class="action-buttons">
+                        <button class="action-btn like-btn">
+                            <i class="far fa-heart"></i>
+                        </button>
+                        <button class="action-btn">
+                            <i class="far fa-comment"></i>
+                        </button>
+                        <button class="action-btn">
+                            <i class="far fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <button class="action-btn save-btn">
+                        <i class="far fa-bookmark"></i>
+                    </button>
+                </div>
+                <div class="post-info">
+                    <div class="likes-count">
+                        <strong>1,234 likes</strong>
+                    </div>
+                    <div class="post-caption">
+                        <strong>mike_photos</strong> Beautiful sunset at the beach! 🌅
+                        <span class="caption-more">... more</span>
+                    </div>
+                    <button class="view-comments">View all 45 comments</button>
+                    <div class="post-time">2 HOURS AGO</div>
+                </div>
+            </article>
+
+            <!-- Post 2 -->
+            <article class="post-card">
+                <div class="post-header">
+                    <div class="user-info">
+                        <img src="https://i.pravatar.cc/150?img=8" alt="User" class="user-avatar">
+                        <div class="user-details">
+                            <span class="username">travel_adventures</span>
+                            <span class="location">Paris, France</span>
+                        </div>
+                    </div>
+                    <button class="post-options">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                </div>
+                <div class="post-image">
+                    <img src="https://picsum.photos/600/600?random=2" alt="Post">
+                </div>
+                <div class="post-actions">
+                    <div class="action-buttons">
+                        <button class="action-btn like-btn">
+                            <i class="far fa-heart"></i>
+                        </button>
+                        <button class="action-btn">
+                            <i class="far fa-comment"></i>
+                        </button>
+                        <button class="action-btn">
+                            <i class="far fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <button class="action-btn save-btn">
+                        <i class="far fa-bookmark"></i>
+                    </button>
+                </div>
+                <div class="post-info">
+                    <div class="likes-count">
+                        <strong>856 likes</strong>
+                    </div>
+                    <div class="post-caption">
+                        <strong>travel_adventures</strong> Eiffel Tower never gets old! 🗼✨
+                        <span class="caption-more">... more</span>
+                    </div>
+                    <button class="view-comments">View all 23 comments</button>
+                    <div class="post-time">5 HOURS AGO</div>
+                </div>
+            </article>
+
+            <!-- Post 3 -->
+            <article class="post-card">
+                <div class="post-header">
+                    <div class="user-info">
+                        <img src="https://i.pravatar.cc/150?img=9" alt="User" class="user-avatar">
+                        <div class="user-details">
+                            <span class="username">foodie_delights</span>
+                            <span class="location">Tokyo, Japan</span>
+                        </div>
+                    </div>
+                    <button class="post-options">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                </div>
+                <div class="post-image">
+                    <img src="https://picsum.photos/600/600?random=3" alt="Post">
+                </div>
+                <div class="post-actions">
+                    <div class="action-buttons">
+                        <button class="action-btn like-btn">
+                            <i class="far fa-heart"></i>
+                        </button>
+                        <button class="action-btn">
+                            <i class="far fa-comment"></i>
+                        </button>
+                        <button class="action-btn">
+                            <i class="far fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <button class="action-btn save-btn">
+                        <i class="far fa-bookmark"></i>
+                    </button>
+                </div>
+                <div class="post-info">
+                    <div class="likes-count">
+                        <strong>2,341 likes</strong>
+                    </div>
+                    <div class="post-caption">
+                        <strong>foodie_delights</strong> Amazing ramen in Shibuya! 🍜
+                        <span class="caption-more">... more</span>
+                    </div>
+                    <button class="view-comments">View all 67 comments</button>
+                    <div class="post-time">1 DAY AGO</div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Sidebar (for desktop) -->
+        <aside class="sidebar">
+            <div class="user-profile">
+                <img src="https://i.pravatar.cc/150?img=10" alt="Your profile" class="profile-avatar">
+                <div class="profile-info">
+                    <span class="profile-username">your_username</span>
+                    <span class="profile-name">Your Name</span>
+                </div>
+                <button class="switch-btn">Switch</button>
+            </div>
+
+            <div class="suggestions">
+                <div class="suggestions-header">
+                    <span>Suggestions For You</span>
+                    <button class="see-all">See All</button>
+                </div>
+                <div class="suggestion-item">
+                    <img src="https://i.pravatar.cc/150?img=11" alt="User">
+                    <div class="suggestion-info">
+                        <span class="suggestion-username">suggested_user1</span>
+                        <span class="suggestion-reason">Followed by user_one</span>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+                <div class="suggestion-item">
+                    <img src="https://i.pravatar.cc/150?img=12" alt="User">
+                    <div class="suggestion-info">
+                        <span class="suggestion-username">cool_photos</span>
+                        <span class="suggestion-reason">Followed by travel_girl</span>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+                <div class="suggestion-item">
+                    <img src="https://i.pravatar.cc/150?img=13" alt="User">
+                    <div class="suggestion-info">
+                        <span class="suggestion-username">photo_artist</span>
+                        <span class="suggestion-reason">New to Mikesta</span>
+                    </div>
+                    <button class="follow-btn">Follow</button>
+                </div>
+            </div>
+
+            <footer class="sidebar-footer">
+                <div class="footer-links">
+                    <a href="#">About</a> · <a href="#">Help</a> · <a href="#">Press</a> · 
+                    <a href="#">API</a> · <a href="#">Jobs</a> · <a href="#">Privacy</a> · 
+                    <a href="#">Terms</a>
+                </div>
+                <div class="footer-copyright">
+                    © 2024 MIKESTA
+                </div>
+            </footer>
+        </aside>
+    </main>
+
+    <!-- Upload Modal -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Post</h2>
+                <button class="close-modal" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Drag photos here</h3>
+                    <p>or</p>
+                    <button class="select-btn" id="selectFileBtn">Select from computer</button>
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                </div>
+                <div class="preview-area" id="previewArea" style="display: none;">
+                    <img id="previewImage" src="" alt="Preview">
+                    <div class="post-details">
+                        <div class="detail-header">
+                            <img src="https://i.pravatar.cc/150?img=10" alt="Your profile" class="detail-avatar">
+                            <span class="detail-username">your_username</span>
+                        </div>
+                        <textarea placeholder="Write a caption..." id="captionInput"></textarea>
+                        <input type="text" placeholder="Add location" id="locationInput">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-btn" id="cancelBtn">Cancel</button>
+                <button class="share-btn" id="shareBtn">Share</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
