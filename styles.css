@@ -3303,3 +3303,516 @@ img {
     max-width: none;
   }
 }
+
+/* ==========================================================================
+   World Map of Moments Modal
+   ========================================================================== */
+.map-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 16, 14, 0.85);
+  backdrop-filter: blur(14px);
+  padding: 20px;
+}
+
+.map-modal.active {
+  display: flex;
+  animation: fadeIn 0.25s ease;
+}
+
+.map-modal-card {
+  width: min(880px, 95vw);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+}
+
+.map-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.map-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 440px;
+  background: #141e1c;
+  overflow: hidden;
+}
+
+.world-map-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.map-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 10;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.map-pin:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+  z-index: 20;
+}
+
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 12px rgba(231, 111, 81, 0.8);
+  position: relative;
+}
+
+.pin-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0.6;
+  animation: pinPulse 2s infinite ease-out;
+}
+
+@keyframes pinPulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+.map-popup-card {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 25;
+  width: min(300px, calc(100% - 40px));
+  background: var(--surface-translucent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: none;
+  box-shadow: var(--shadow-lg);
+  animation: dropdownIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.map-popup-card.open {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.map-popup-img {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.map-popup-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.map-popup-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0 0 2px;
+  color: var(--ink);
+}
+
+.map-popup-author {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+/* ==========================================================================
+   Fine Art Editorial Postcard Export Modal
+   ========================================================================== */
+.postcard-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 16, 14, 0.88);
+  backdrop-filter: blur(14px);
+  padding: 20px;
+}
+
+.postcard-modal.active {
+  display: flex;
+  animation: fadeIn 0.25s ease;
+}
+
+.postcard-card {
+  width: min(560px, 94vw);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+}
+
+.postcard-print-area {
+  padding: 36px 36px 28px;
+  background: #faf8f5;
+  color: #1a2422;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.postcard-image-frame {
+  width: 100%;
+  aspect-ratio: 1.25;
+  overflow: hidden;
+  background: #e6e3dd;
+  border-radius: 2px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  margin-bottom: 22px;
+}
+
+.postcard-image-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.postcard-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 20px;
+  font-style: italic;
+  margin: 0 0 6px;
+  color: #1a2422;
+}
+
+.postcard-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7b8883;
+  margin-bottom: 16px;
+}
+
+.postcard-seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid #dcd7ce;
+  border-radius: 999px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #928b80;
+}
+
+.postcard-footer-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* ==========================================================================
+   Stacks / Moodboards Decks (Profile Stacks Tab)
+   ========================================================================== */
+.stacks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.stack-card {
+  position: relative;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 12px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stack-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.stack-deck-preview {
+  position: relative;
+  aspect-ratio: 1;
+  margin-bottom: 14px;
+}
+
+.stack-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--surface);
+  transition: transform var(--transition-fast);
+}
+
+.stack-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stack-card:hover .stack-layer:nth-child(1) {
+  transform: rotate(-6deg) scale(0.95);
+}
+.stack-card:hover .stack-layer:nth-child(2) {
+  transform: rotate(5deg) scale(0.98);
+}
+.stack-card:hover .stack-layer:nth-child(3) {
+  transform: rotate(0deg) scale(1.02);
+}
+
+.stack-info h4 {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.stack-info span {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ==========================================================================
+   Visual Keyboard Map Modal (?)
+   ========================================================================== */
+.keyboard-guide-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 16, 14, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 20px;
+}
+
+.keyboard-guide-modal.active {
+  display: flex;
+  animation: fadeIn 0.25s ease;
+}
+
+.keyboard-guide-card {
+  width: min(640px, 95vw);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--line);
+}
+
+.keyboard-guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.keyboard-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 24px;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+}
+
+.shortcut-desc {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.key-cap {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  box-shadow: 0 2px 0 var(--line);
+}
+
+@media (max-width: 640px) {
+  .stacks-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .keyboard-guide-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.link-btn-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--transition-fast);
+}
+
+.link-btn-text:hover {
+  color: var(--accent);
+}
+
+.map-trigger-pill {
+  margin-left: auto;
+  border: 1px solid var(--accent) !important;
+  color: var(--accent) !important;
+  background: var(--surface) !important;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-trigger-pill:hover {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+/* Film grain toggle state */
+.film-grain-layer.hidden {
+  display: none !important;
+}
+
+/* Analog Camera Shutter Flash */
+.shutter-flash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #ffffff;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+.shutter-flash-overlay.flashing {
+  opacity: 0.82;
+  transition: none;
+}
+
+/* ==========================================================================
+   Zen Focus Reading Mode
+   ========================================================================== */
+body.zen-mode .navbar,
+body.zen-mode .sidebar,
+body.zen-mode .explore-tags,
+body.zen-mode .stories-section,
+body.zen-mode .moment-of-the-day-banner,
+body.zen-mode .feed-filter-bar,
+body.zen-mode .mobile-nav-bar,
+body.zen-mode .site-footer {
+  display: none !important;
+}
+
+body.zen-mode .layout {
+  grid-template-columns: 1fr;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 16px 80px;
+}
+
+body.zen-mode .post-card {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+  margin-bottom: 48px;
+  border-radius: var(--radius-lg);
+}
+
+body.zen-mode .inline-comment-form {
+  display: none;
+}
+
+.zen-floating-pill {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--surface-translucent);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  animation: dropdownIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.zen-mode .zen-floating-pill {
+  display: flex;
+}
+
+.zen-exit-btn {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--accent);
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  transition: background var(--transition-fast);
+}
+
+.zen-exit-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+
+

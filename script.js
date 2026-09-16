@@ -1101,10 +1101,16 @@ function openStoryCreator() {
    ========================================================================== */
 const COMMANDS = [
   { key: 'N', label: 'Create new post', action: () => window.openUploadModal?.() },
+  { key: 'Z', label: 'Toggle Zen Reading Mode', action: () => toggleZenMode() },
+  { key: 'W', label: 'Explore World Moments Map', action: () => openWorldMap() },
+  { key: 'E', label: 'Export fine art postcard', action: () => { const p = $('.post-card'); openPostcardExport(p ? getPostId(p) : 'post-1'); } },
+  { key: 'C', label: 'Camera shutter snapshot', action: () => triggerShutterFlash() },
+  { key: 'G', label: 'Toggle analog film grain texture', action: () => toggleGrain() },
   { key: 'D', label: 'Open Direct Messages', action: () => openChat() },
   { key: 'R', label: 'Toggle Circle Radio', action: () => sounds.toggleAmbientRadio() },
   { key: 'T', label: 'Cycle aesthetic vibe (theme)', action: () => cycleTheme() },
   { key: 'M', label: 'Toggle sound effects', action: () => toggleSound() },
+  { key: '?', label: 'Show visual shortcuts guide', action: () => openKeyboardGuide() },
   { key: 'P', label: 'Go to your profile', action: () => window.location.href = 'profile.html' },
   { key: 'H', label: 'Go to home feed', action: () => window.location.href = 'index.html' },
   { key: 'S', label: 'Create new story', action: () => openStoryCreator() },
@@ -1368,11 +1374,16 @@ function showPostMenu(post) {
   const postId = getPostId(post);
   const menu = document.createElement('div');
   menu.className = 'choice-list';
+  const postcard = makeButton('🖼 Export fine art postcard', 'choice-item');
   const exif = makeButton('Inspect camera & exposure data (EXIF)', 'choice-item');
   const copy = makeButton('Copy link to moment', 'choice-item');
   const mute = makeButton('Mute this creator', 'choice-item');
   const report = makeButton('Report inappropriate content', 'choice-item danger');
 
+  on(postcard, 'click', () => {
+    closeDialog();
+    openPostcardExport(postId);
+  });
   on(exif, 'click', () => {
     closeDialog();
     showExifDetails(postId);
@@ -1395,7 +1406,7 @@ function showPostMenu(post) {
     announce('Thanks for helping keep Mikesta welcoming.', 'success');
   });
 
-  menu.append(exif, copy, mute, report);
+  menu.append(postcard, exif, copy, mute, report);
   openDialog('Post options', menu, 'Manage');
 }
 
@@ -2308,6 +2319,9 @@ function setupProfilePage() {
       if (index === 1) {
         renderSavedProfileGrid();
         announce('Showing your saved collection.');
+      } else if (index === 2) {
+        renderStacksProfileGrid();
+        announce('Showing your curated moodboard stacks.');
       } else {
         hydrateProfilePosts();
         announce('Showing your posts.');
@@ -2439,6 +2453,596 @@ function setupProfileGridLightbox() {
 }
 
 /* ==========================================================================
+   Interactive World Map of Moments
+   ========================================================================== */
+const MAP_LOCATIONS = [
+  {
+    id: 'post-1',
+    title: 'Rockaway Beach',
+    coords: '40.5853° N, 73.8160° W',
+    creator: 'mike.photos',
+    avatar: 'https://i.pravatar.cc/150?img=10',
+    x: 23,
+    y: 34,
+    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80',
+    tag: 'coast'
+  },
+  {
+    id: 'post-2',
+    title: 'Alfama, Lisbon',
+    coords: '38.7118° N, 9.1306° W',
+    creator: 'travel.adventures',
+    avatar: 'https://i.pravatar.cc/150?img=8',
+    x: 46,
+    y: 33,
+    image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=400&q=80',
+    tag: 'architecture'
+  },
+  {
+    id: 'post-3',
+    title: 'Greenpoint, Brooklyn',
+    coords: '40.7282° N, 73.9537° W',
+    creator: 'ava.studio',
+    avatar: 'https://i.pravatar.cc/150?img=1',
+    x: 24.5,
+    y: 35.5,
+    image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&q=80',
+    tag: 'coffee'
+  },
+  {
+    id: 'post-4',
+    title: 'Redwood National Park',
+    coords: '41.2132° N, 124.0046° W',
+    creator: 'sam.builds',
+    avatar: 'https://i.pravatar.cc/150?img=5',
+    x: 16,
+    y: 32,
+    image: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=400&q=80',
+    tag: 'nature'
+  },
+  {
+    id: 'tokyo-1',
+    title: 'Shibuya, Tokyo',
+    coords: '35.6595° N, 139.7005° E',
+    creator: 'nora.eats',
+    avatar: 'https://i.pravatar.cc/150?img=4',
+    x: 82,
+    y: 38,
+    image: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=400&q=80',
+    tag: 'featured'
+  },
+  {
+    id: 'iceland-1',
+    title: 'Reykjavik Coast',
+    coords: '64.1466° N, 21.9426° W',
+    creator: 'maya.moves',
+    avatar: 'https://i.pravatar.cc/150?img=2',
+    x: 44,
+    y: 20,
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+    tag: 'nature'
+  },
+  {
+    id: 'hudson-1',
+    title: 'Hudson Valley Ridge',
+    coords: '41.7472° N, 74.0868° W',
+    creator: 'chris.cole',
+    avatar: 'https://i.pravatar.cc/150?img=12',
+    x: 23.8,
+    y: 32.5,
+    image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=400&q=80',
+    tag: 'nature'
+  }
+];
+
+function openWorldMap() {
+  let modal = $('#worldMapModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'worldMapModal';
+    modal.className = 'map-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'World Map of Moments');
+    modal.innerHTML = `
+      <div class="map-modal-card">
+        <div class="map-modal-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <i class="fa-solid fa-earth-americas" style="color: var(--accent); font-size: 20px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink);">World Map of Moments</h3>
+              <span style="font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted);">${MAP_LOCATIONS.length} global coordinates documented across 4 continents</span>
+            </div>
+          </div>
+          <button type="button" class="close-modal" id="closeMapModal" aria-label="Close Map">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="map-canvas-container" id="mapCanvasContainer">
+          <svg class="world-map-svg" viewBox="0 0 1000 500" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id="mapGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#243833" stop-opacity="0.6"/>
+                <stop offset="100%" stop-color="#141e1c" stop-opacity="1"/>
+              </radialGradient>
+            </defs>
+            <rect width="1000" height="500" fill="url(#mapGlow)"/>
+            <line x1="0" y1="125" x2="1000" y2="125" stroke="#1d2d2a" stroke-width="1" stroke-dasharray="4 4"/>
+            <line x1="0" y1="250" x2="1000" y2="250" stroke="#283e39" stroke-width="1.5" stroke-dasharray="6 4"/>
+            <line x1="0" y1="375" x2="1000" y2="375" stroke="#1d2d2a" stroke-width="1" stroke-dasharray="4 4"/>
+            <line x1="250" y1="0" x2="250" y2="500" stroke="#1d2d2a" stroke-width="1" stroke-dasharray="4 4"/>
+            <line x1="500" y1="0" x2="500" y2="500" stroke="#283e39" stroke-width="1.5" stroke-dasharray="6 4"/>
+            <line x1="750" y1="0" x2="750" y2="500" stroke="#1d2d2a" stroke-width="1" stroke-dasharray="4 4"/>
+            <!-- Continents -->
+            <path d="M 120,80 Q 210,60 270,90 Q 310,140 260,210 Q 210,230 190,290 Q 150,260 130,190 Z" fill="#20332e" opacity="0.85"/>
+            <path d="M 240,280 Q 320,310 290,410 Q 260,470 230,440 Q 210,360 240,280 Z" fill="#20332e" opacity="0.85"/>
+            <path d="M 440,90 Q 530,80 540,140 Q 480,180 430,150 Z" fill="#20332e" opacity="0.85"/>
+            <path d="M 450,180 Q 560,190 540,310 Q 490,410 440,330 Q 420,240 450,180 Z" fill="#20332e" opacity="0.85"/>
+            <path d="M 540,80 Q 770,70 860,140 Q 820,270 700,280 Q 610,210 540,140 Z" fill="#20332e" opacity="0.85"/>
+            <path d="M 740,330 Q 840,330 830,410 Q 750,420 740,330 Z" fill="#20332e" opacity="0.85"/>
+          </svg>
+
+          <div class="map-pins-layer" id="mapPinsLayer"></div>
+
+          <div class="map-popup-card" id="mapPopupCard">
+            <img class="map-popup-img" id="mapPopupImg" src="" alt="">
+            <div class="map-popup-info">
+              <h4 class="map-popup-title" id="mapPopupTitle"></h4>
+              <div class="map-popup-author" id="mapPopupAuthor"></div>
+              <button type="button" class="tag-pill active" id="mapPopupActionBtn" style="font-size: 11px; padding: 4px 10px;">Inspect Moment</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeBtn = $('#closeMapModal', modal);
+    on(closeBtn, 'click', () => modal.classList.remove('active'));
+    on(modal, 'click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+
+    const container = $('#mapPinsLayer', modal);
+    MAP_LOCATIONS.forEach((loc) => {
+      const pin = document.createElement('div');
+      pin.className = 'map-pin';
+      pin.style.left = `${loc.x}%`;
+      pin.style.top = `${loc.y}%`;
+      pin.title = `${loc.title} · ${loc.creator}`;
+      pin.innerHTML = `
+        <div class="pin-pulse"></div>
+        <div class="pin-dot"></div>
+      `;
+
+      on(pin, 'click', (e) => {
+        e.stopPropagation();
+        sounds.pop();
+        showMapPopup(loc);
+      });
+
+      container.appendChild(pin);
+    });
+
+    on($('#mapCanvasContainer', modal), 'click', (e) => {
+      if (!e.target.closest('.map-pin') && !e.target.closest('#mapPopupCard')) {
+        $('#mapPopupCard', modal)?.classList.remove('open');
+      }
+    });
+  }
+
+  const showMapPopup = (loc) => {
+    const card = $('#mapPopupCard', modal);
+    const img = $('#mapPopupImg', modal);
+    const title = $('#mapPopupTitle', modal);
+    const author = $('#mapPopupAuthor', modal);
+    const actionBtn = $('#mapPopupActionBtn', modal);
+
+    img.src = loc.image;
+    title.textContent = loc.title;
+    author.textContent = `@${loc.creator} · ${loc.coords}`;
+    card.classList.add('open');
+
+    actionBtn.onclick = () => {
+      modal.classList.remove('active');
+      sounds.pop();
+      const targetPost = $(`[data-post-id="${loc.id}"]`);
+      if (targetPost) {
+        targetPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetPost.style.transition = 'box-shadow 0.4s ease';
+        targetPost.style.boxShadow = '0 0 0 3px var(--accent)';
+        setTimeout(() => targetPost.style.boxShadow = '', 2000);
+      } else if (loc.tag) {
+        filterFeedByTag(loc.tag);
+      }
+    };
+  };
+
+  modal.classList.add('active');
+  sounds.pop();
+  announce('World Map of Moments opened.');
+}
+
+/* ==========================================================================
+   Fine Art Editorial Postcard Export Modal
+   ========================================================================== */
+function openPostcardExport(postId = 'post-1') {
+  let modal = $('#postcardModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'postcardModal';
+    modal.className = 'postcard-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Fine Art Postcard Export');
+    modal.innerHTML = `
+      <div class="postcard-card">
+        <div class="map-modal-header" style="padding: 16px 24px; border-bottom: 1px solid var(--line);">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-stamp" style="color: var(--accent); font-size: 18px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 15px; font-weight: 800; color: var(--ink);">Fine Art Editorial Postcard</h3>
+              <span style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted);">Archival Print & Typography Specification</span>
+            </div>
+          </div>
+          <button type="button" class="close-modal" id="closePostcardModal" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="postcard-print-area" id="postcardPrintArea">
+          <div class="postcard-image-frame">
+            <img id="postcardPreviewImg" src="" alt="Postcard Moment" crossorigin="anonymous">
+          </div>
+          <h2 class="postcard-title" id="postcardTitle">Moment Study</h2>
+          <div class="postcard-meta" id="postcardMeta">LEICA M11 · 35MM F/1.4 · 1/500S · ISO 100</div>
+          <div class="postcard-seal">
+            <i class="fa-solid fa-certificate"></i>
+            <span>✦ MIKESTA ARCHIVE · NEW YORK ✦</span>
+          </div>
+        </div>
+        <div class="postcard-footer-bar">
+          <button type="button" class="button-outline" id="postcardCopyBtn">Copy Share Link</button>
+          <button type="button" class="dialog-action" id="postcardDownloadBtn">
+            <i class="fa-solid fa-arrow-down-to-bracket"></i> Download Fine Art Card
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    on($('#closePostcardModal', modal), 'click', () => modal.classList.remove('active'));
+    on(modal, 'click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+
+    on($('#postcardCopyBtn', modal), async () => {
+      try {
+        await navigator.clipboard.writeText(location.href);
+        announce('Postcard link copied to clipboard.', 'success');
+      } catch {
+        announce('Link ready in your browser address bar.');
+      }
+      sounds.pop();
+    });
+
+    on($('#postcardDownloadBtn', modal), () => {
+      generatePostcardCanvasDownload(modal.dataset.currentPostId || 'post-1');
+    });
+  }
+
+  modal.dataset.currentPostId = postId;
+  const postEl = $(`[data-post-id="${postId}"]`);
+  const exif = POST_EXIF[postId] || {
+    camera: 'Leica M11',
+    lens: 'Summilux 35mm f/1.4',
+    shutter: '1/500s',
+    aperture: 'f/1.4',
+    iso: 'ISO 100'
+  };
+
+  const imgEl = $('#postcardPreviewImg', modal);
+  const titleEl = $('#postcardTitle', modal);
+  const metaEl = $('#postcardMeta', modal);
+
+  let imgSrc = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85';
+  let titleText = 'Rockaway Tide Study';
+
+  if (postEl) {
+    const postImg = $('img', postEl);
+    if (postImg) imgSrc = postImg.src;
+    const caption = $('.post-caption', postEl)?.textContent || '';
+    if (caption) titleText = caption.replace(/^[a-z0-9._]+\s*/i, '').slice(0, 48) || titleText;
+  }
+
+  imgEl.src = imgSrc;
+  titleEl.textContent = titleText;
+  metaEl.textContent = `${exif.camera.toUpperCase()} · ${exif.lens.toUpperCase()} · ${exif.shutter} · ${exif.iso}`;
+
+  modal.classList.add('active');
+  sounds.pop();
+  announce('Postcard studio opened.');
+}
+
+function generatePostcardCanvasDownload(postId) {
+  const modal = $('#postcardModal');
+  const imgEl = $('#postcardPreviewImg', modal);
+  const titleText = $('#postcardTitle', modal)?.textContent || 'Moment Study';
+  const metaText = $('#postcardMeta', modal)?.textContent || 'LEICA M11 · 35MM F/1.4';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1200;
+  canvas.height = 1500;
+  const ctx = canvas.getContext('2d');
+
+  // Fine art paper background
+  ctx.fillStyle = '#FAF8F5';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Subtle inner border
+  ctx.strokeStyle = '#E6E2D8';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(40, 40, canvas.width - 80, canvas.height - 80);
+
+  const drawCardTextsAndDownload = () => {
+    // Title
+    ctx.fillStyle = '#1A2422';
+    ctx.font = 'italic 52px "Playfair Display", Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(titleText, 600, 1140);
+
+    // Meta plate
+    ctx.fillStyle = '#7B8883';
+    ctx.font = '600 22px "DM Mono", Menlo, monospace';
+    ctx.letterSpacing = '2px';
+    ctx.fillText(metaText, 600, 1220);
+
+    // Archive seal
+    ctx.strokeStyle = '#DCD7CE';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(420, 1280, 360, 56);
+
+    ctx.fillStyle = '#928B80';
+    ctx.font = '700 18px "DM Mono", Menlo, monospace';
+    ctx.fillText('✦ MIKESTA ARCHIVE · NEW YORK ✦', 600, 1316);
+
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.download = `mikesta-postcard-${postId}.png`;
+      a.href = dataUrl;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      triggerShutterFlash();
+      announce('Fine art postcard downloaded to your device.', 'success');
+    } catch {
+      triggerShutterFlash();
+      announce('High-res postcard preview compiled.', 'success');
+    }
+  };
+
+  const image = new Image();
+  image.crossOrigin = 'anonymous';
+  image.onload = () => {
+    ctx.fillStyle = '#E8E4DC';
+    ctx.fillRect(96, 96, 1008, 928);
+    ctx.drawImage(image, 100, 100, 1000, 920);
+    drawCardTextsAndDownload();
+  };
+  image.onerror = () => {
+    ctx.fillStyle = '#3E5C56';
+    ctx.fillRect(100, 100, 1000, 920);
+    ctx.fillStyle = '#FAF8F5';
+    ctx.font = 'bold 36px "DM Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('MIKESTA EDITORIAL PHOTOGRAPHY', 600, 560);
+    drawCardTextsAndDownload();
+  };
+  image.src = imgEl.src;
+}
+
+/* ==========================================================================
+   Visual Keyboard Shortcuts Guide Modal
+   ========================================================================== */
+function openKeyboardGuide() {
+  let modal = $('#keyboardGuideModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'keyboardGuideModal';
+    modal.className = 'keyboard-guide-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Keyboard Shortcuts Guide');
+
+    const SHORTCUTS = [
+      { key: '⌘K', desc: 'Open Linear Command Palette' },
+      { key: '?', desc: 'Show this shortcuts guide' },
+      { key: 'Z', desc: 'Toggle Zen reading focus mode' },
+      { key: 'W', desc: 'Explore World Moments Map' },
+      { key: 'E', desc: 'Export fine art postcard' },
+      { key: 'C', desc: 'Camera shutter snapshot flash' },
+      { key: 'G', desc: 'Toggle analog film grain texture' },
+      { key: 'T', desc: 'Cycle aesthetic vibes (theme)' },
+      { key: 'M', desc: 'Mute / Unmute tactile soundscapes' },
+      { key: 'R', desc: 'Toggle Ambient Circle Radio' },
+      { key: 'D', desc: 'Open Direct Messages drawer' },
+      { key: 'N', desc: 'Create new moment (Upload)' },
+      { key: 'S', desc: 'Open Story Studio creator' },
+      { key: 'J / K', desc: 'Smooth scroll feed posts' },
+      { key: '/', desc: 'Focus instant search bar' },
+      { key: 'ESC', desc: 'Dismiss active sheet or modal' }
+    ];
+
+    modal.innerHTML = `
+      <div class="keyboard-guide-card">
+        <div class="keyboard-guide-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-keyboard" style="color: var(--accent); font-size: 18px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--ink);">Keyboard Shortcuts</h3>
+              <span style="font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted);">Pro Navigation Matrix</span>
+            </div>
+          </div>
+          <button type="button" class="close-modal" id="closeKeyboardGuide" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="keyboard-guide-grid">
+          ${SHORTCUTS.map((s) => `
+            <div class="shortcut-row">
+              <span class="shortcut-desc">${escapeHtml(s.desc)}</span>
+              <span class="key-cap">${escapeHtml(s.key)}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div style="padding: 14px 24px; border-top: 1px solid var(--line); background: var(--paper); display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px; color: var(--muted);">Press any key anytime to navigate without a mouse.</span>
+          <button type="button" class="tag-pill active" id="tryCommandPaletteBtn">Try ⌘K Now</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    on($('#closeKeyboardGuide', modal), 'click', () => modal.classList.remove('active'));
+    on(modal, 'click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+
+    on($('#tryCommandPaletteBtn', modal), () => {
+      modal.classList.remove('active');
+      toggleCommandPalette();
+    });
+  }
+
+  modal.classList.add('active');
+  sounds.pop();
+  announce('Keyboard guide opened.');
+}
+
+/* ==========================================================================
+   Stacks / Moodboards Decks (Profile Stacks Tab)
+   ========================================================================== */
+const PROFILE_STACKS = [
+  {
+    id: 'stack-coast',
+    title: 'Atlantic Horizons',
+    count: '12 moments',
+    subtitle: 'Rockaway · Montauk · Cape May',
+    images: [
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 'stack-arch',
+    title: 'Architectural Solitude',
+    count: '18 moments',
+    subtitle: 'Lisbon · Berlin · Brooklyn',
+    images: [
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 'stack-coffee',
+    title: 'Morning Rituals',
+    count: '9 moments',
+    subtitle: 'Espresso · Cedar · Notebooks',
+    images: [
+      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  {
+    id: 'stack-tokyo',
+    title: 'Tokyo Street Forms',
+    count: '14 moments',
+    subtitle: 'Shibuya · Daikanyama · Nakameguro',
+    images: [
+      'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=600&q=80'
+    ]
+  }
+];
+
+function renderStacksProfileGrid() {
+  const grid = $('.profile-grid');
+  if (!grid) return;
+  const colTabs = $('.collection-tabs');
+  if (colTabs) colTabs.remove();
+
+  grid.innerHTML = `
+    <div class="stacks-grid" style="grid-column: 1 / -1;">
+      ${PROFILE_STACKS.map((stack) => `
+        <div class="stack-card" data-stack-id="${stack.id}">
+          <div class="stack-deck-preview">
+            <div class="stack-layer"><img src="${stack.images[0]}" alt="${escapeHtml(stack.title)}"></div>
+            <div class="stack-layer"><img src="${stack.images[1]}" alt="${escapeHtml(stack.title)}"></div>
+            <div class="stack-layer"><img src="${stack.images[2]}" alt="${escapeHtml(stack.title)}"></div>
+          </div>
+          <div class="stack-info">
+            <h4>${escapeHtml(stack.title)}</h4>
+            <span>${escapeHtml(stack.count)} · ${escapeHtml(stack.subtitle)}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  $$('.stack-card', grid).forEach((card) => {
+    on(card, 'click', () => {
+      sounds.pop();
+      const stackId = card.dataset.stackId;
+      const stack = PROFILE_STACKS.find((s) => s.id === stackId);
+      if (!stack) return;
+
+      const body = document.createElement('div');
+      body.innerHTML = `
+        <p style="margin-top: 0; font-size: 13px; color: var(--muted);">${escapeHtml(stack.subtitle)} · Curated series</p>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0;">
+          ${stack.images.map((img) => `
+            <img src="${img}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; cursor: pointer;" alt="${escapeHtml(stack.title)}">
+          `).join('')}
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="button-outline" id="stackPostcardBtn">Export as Postcard</button>
+          <button type="button" class="dialog-action" id="stackAddBtn">Add Photo to Stack</button>
+        </div>
+      `;
+
+      on($('#stackPostcardBtn', body), () => {
+        closeDialog();
+        openPostcardExport('post-1');
+      });
+
+      on($('#stackAddBtn', body), () => {
+        closeDialog();
+        announce(`Select a photo from your library to add to ${stack.title}.`);
+        window.openUploadModal?.();
+      });
+
+      $$('img', body).forEach((img) => {
+        on(img, 'click', () => {
+          closeDialog();
+          openLightbox({
+            image: img.src,
+            username: 'mike.photos',
+            caption: `${stack.title} · ${stack.subtitle}`,
+            location: 'Archival Series'
+          });
+        });
+      });
+
+      openDialog(stack.title, body, 'Moodboard Stack');
+    });
+  });
+}
+
+/* ==========================================================================
    State Restoration & Global Event Listeners
    ========================================================================== */
 function restoreState() {
@@ -2476,6 +3080,15 @@ function restoreState() {
       });
     });
   }
+
+  const worldMapPill = $('#worldMapPill');
+  if (worldMapPill) on(worldMapPill, 'click', openWorldMap);
+
+  const footerMapBtn = $('#footerMapBtn');
+  if (footerMapBtn) on(footerMapBtn, 'click', openWorldMap);
+
+  const keyboardGuideBtn = $('#keyboardGuideBtn');
+  if (keyboardGuideBtn) on(keyboardGuideBtn, 'click', openKeyboardGuide);
 
   $$('.post-card').forEach((post) => {
     const id = getPostId(post);
@@ -2575,18 +3188,69 @@ function setupEvents() {
   });
 }
 
+/* ==========================================================================
+   Zen Mode, Film Grain & Shutter Flash Systems
+   ========================================================================== */
+function triggerShutterFlash() {
+  let flash = $('#shutterFlashOverlay');
+  if (!flash) {
+    flash = document.createElement('div');
+    flash.id = 'shutterFlashOverlay';
+    flash.className = 'shutter-flash-overlay';
+    document.body.appendChild(flash);
+  }
+  flash.classList.add('flashing');
+  sounds.shutter();
+  requestAnimationFrame(() => {
+    setTimeout(() => flash.classList.remove('flashing'), 40);
+  });
+}
+
+function toggleGrain() {
+  const grain = $('.film-grain-layer');
+  if (!grain) return;
+  const isHidden = grain.classList.toggle('hidden');
+  sounds.pop();
+  announce(isHidden ? 'Film grain disabled.' : 'Analog film grain enabled.');
+}
+
+function toggleZenMode() {
+  const isZen = document.body.classList.toggle('zen-mode');
+  let pill = $('#zenFloatingPill');
+  if (!pill) {
+    pill = document.createElement('div');
+    pill.id = 'zenFloatingPill';
+    pill.className = 'zen-floating-pill';
+    pill.innerHTML = `
+      <span><i class="fa-solid fa-feather"></i> Zen Reading Mode</span>
+      <button type="button" class="zen-exit-btn" id="zenExitBtn">Exit (Z)</button>
+    `;
+    document.body.appendChild(pill);
+    on($('#zenExitBtn', pill), 'click', toggleZenMode);
+  }
+  sounds.pop();
+  announce(isZen ? 'Zen Focus Mode activated. Press Z or ESC to exit.' : 'Exited Zen mode.');
+}
+
 // Global Keyboard Navigation
 on(document, 'keydown', (event) => {
   const activeTag = document.activeElement?.tagName;
   const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
 
   if (event.key === 'Escape') {
+    if (document.body.classList.contains('zen-mode')) {
+      toggleZenMode();
+      return;
+    }
     closeDialog();
     closeChat();
     storyViewer.close();
     $('#lightboxModal')?.classList.remove('active');
     $('#commandPaletteBackdrop')?.classList.remove('active');
     $('#creatorModal')?.classList.remove('active');
+    $('#worldMapModal')?.classList.remove('active');
+    $('#postcardModal')?.classList.remove('active');
+    $('#keyboardGuideModal')?.classList.remove('active');
     return;
   }
 
@@ -2600,7 +3264,18 @@ on(document, 'keydown', (event) => {
 
   if (event.key === '?') {
     event.preventDefault();
-    toggleCommandPalette();
+    openKeyboardGuide();
+  } else if (event.key === 'z' || event.key === 'Z') {
+    toggleZenMode();
+  } else if (event.key === 'g' || event.key === 'G') {
+    toggleGrain();
+  } else if (event.key === 'c' || event.key === 'C') {
+    triggerShutterFlash();
+  } else if (event.key === 'w' || event.key === 'W') {
+    openWorldMap();
+  } else if (event.key === 'e' || event.key === 'E') {
+    const post = $('.post-card');
+    openPostcardExport(post ? getPostId(post) : 'post-1');
   } else if (event.key === 't' || event.key === 'T') {
     cycleTheme();
   } else if (event.key === 'm' || event.key === 'M') {
