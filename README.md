@@ -1,78 +1,42 @@
-# Mikesta 📸
+# Mikesta
 
-A modern, Instagram-inspired photo-sharing web application built with HTML, CSS, and vanilla JavaScript.
+Mikesta is a responsive social photo-sharing prototype built with semantic HTML, CSS, and vanilla JavaScript. It is intentionally small enough to inspect in an interview, but it behaves like a real product surface rather than a static mockup.
 
-## Features
+## Product flows
 
-- **Photo Feed**: Browse through a beautiful grid of photos with user information
-- **Stories**: Scrollable stories section with gradient rings
-- **Upload Photos**: Drag-and-drop or select photos to upload with captions and locations
-- **Interactive Actions**: Like, comment, and save posts
-- **User Suggestions**: Discover new users to follow
-- **Responsive Design**: Fully responsive layout that works on desktop, tablet, and mobile
-- **Modern UI**: Clean, Instagram-like interface with smooth animations
+- Feed with posts, likes, saves, comments, sharing, post actions, and persisted state
+- Stories rail with story viewer and create-your-story entry point
+- Create-post flow with image validation, drag-and-drop preview, caption, location, and optimistic feed insertion
+- Search feedback for creators, locations, and feed content
+- Feed filters: Following, For you, and Recent
+- Follow/unfollow suggestions with local persistence
+- Notifications dialog with activity states
+- Profile page with post/saved tabs and editable profile details
+- Toast feedback, focus management, Escape-to-close, and responsive mobile layouts
 
-## How to Use
+## Run locally
 
-1. Open `index.html` in your web browser
-2. Browse the photo feed and stories
-3. Click the **+** icon in the navigation to upload a new photo
-4. Like posts by clicking the heart icon
-5. Save posts by clicking the bookmark icon
-6. Follow suggested users in the sidebar
+Open `index.html` in a browser. There is no build step. Local state is stored under `localStorage` when the browser permits it; the app remains usable for the current session when opened from a restricted `file://` context.
 
-## Technologies Used
+## Architecture
 
-- **HTML5**: Semantic markup
-- **CSS3**: Modern styling with Grid, Flexbox, and animations
-- **JavaScript**: Vanilla JS for interactivity
-- **Font Awesome**: Icons
-- **External APIs**: Placeholder images from Pravatar and Picsum
+The current client-side state layer in `script.js` is deliberately shaped around a future API boundary:
 
-## File Structure
+| Client action | Future API shape |
+| --- | --- |
+| Load feed | `GET /api/feed?feed=following` |
+| Create post | `POST /api/posts` with image metadata and caption |
+| Like or save post | `PUT /api/posts/:postId/reaction` |
+| Add comment | `POST /api/posts/:postId/comments` |
+| Follow creator | `PUT /api/users/:userId/follow` |
+| Load notifications | `GET /api/notifications` |
+| Update profile | `PATCH /api/me` |
 
-```
-Mikesta/
-├── index.html      # Main HTML structure
-├── styles.css      # All styling and responsive design
-├── script.js       # Interactive functionality
-└── README.md       # Project documentation
-```
+The browser prototype keeps those operations local so the product can be reviewed without credentials or a server. A production version would move the state functions behind `fetch` calls, add authentication, validate uploads server-side, persist media in object storage, and return cursor-based feed pagination.
 
-## Features in Detail
+## Project files
 
-### Photo Upload
-- Drag and drop images or click to select
-- Add captions and location tags
-- Preview before posting
-- Posts appear instantly in feed
-
-### Interactive Posts
-- Like/unlike posts with animated hearts
-- Save posts for later
-- View post details including likes and comments count
-- User profile information on each post
-
-### Responsive Design
-- Desktop: Full sidebar with suggestions
-- Tablet: Optimized layout without sidebar
-- Mobile: Compact view with bottom navigation
-
-## Future Enhancements
-
-- User authentication and profiles
-- Backend integration for data persistence
-- Real commenting system
-- Direct messaging
-- Video support
-- Filters and photo editing
-- Notifications system
-- Explore page
-
-## License
-
-This project is open source and available for educational purposes.
-
----
-
-Built with ❤️ by Mike and Ike
+- `index.html` - feed, stories, sidebar, and create-post modal
+- `profile.html` - profile header, tabs, and post grid
+- `styles.css` - shared responsive visual system and interaction surfaces
+- `script.js` - state, UI primitives, event delegation, persistence, and client workflows
