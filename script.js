@@ -3369,6 +3369,9 @@ function restoreState() {
   const keyboardGuideBtn = $('#keyboardGuideBtn');
   if (keyboardGuideBtn) on(keyboardGuideBtn, 'click', openKeyboardGuide);
 
+  const monographSidebarBtn = $('#monographSidebarBtn');
+  if (monographSidebarBtn) on(monographSidebarBtn, 'click', () => openMonograph(0));
+
   $$('.post-card').forEach((post) => {
     const id = getPostId(post);
     const stats = getPostStats(post);
