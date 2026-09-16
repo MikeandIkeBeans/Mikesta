@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Mike Anderson's visual archive on Mikesta.">
   <title>mike.photos — Mikesta</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23182523'/><circle cx='50' cy='52' r='20' fill='%23f1d879'/><circle cx='50' cy='52' r='14' fill='%23182523'/><circle cx='70' cy='32' r='6' fill='%23e76f51'/></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +24,7 @@
       <div class="search-wrapper">
         <label class="search-bar">
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-          <input type="search" placeholder="Search moments, people, places..." aria-label="Search" autocomplete="off">
+          <input type="search" placeholder="Search moments, people, places... (Press /)" aria-label="Search" autocomplete="off">
           <button type="button" class="search-clear-btn" id="searchClearBtn" aria-label="Clear search">
             <i class="fa-solid fa-circle-xmark"></i>
           </button>
@@ -32,6 +33,11 @@
       </div>
 
       <nav class="nav-icons" aria-label="Primary navigation">
+        <!-- Command Palette Shortcut Pill -->
+        <button class="kbd-nav-btn" id="kbdBtn" title="Command Palette & Shortcuts" aria-label="Command Palette">
+          <span>⌘K</span>
+        </button>
+
         <!-- Vibe Switcher -->
         <button class="vibe-picker-btn" id="vibeBtn" title="Switch vibe" aria-label="Switch vibe">
           <span class="vibe-dot"></span>
@@ -41,6 +47,12 @@
         <!-- Sound Vibes Toggle -->
         <button class="nav-btn sound-btn" id="soundBtn" title="Toggle audio vibes" aria-label="Toggle audio vibes">
           <i class="fa-solid fa-volume-high"></i>
+        </button>
+
+        <!-- Direct Messages / Chat -->
+        <button class="nav-btn" id="chatBtn" title="Direct Messages" aria-label="Direct Messages">
+          <i class="fa-regular fa-paper-plane"></i>
+          <span class="badge-dot" id="chatBadge"></span>
         </button>
 
         <!-- Explore Anchor -->
@@ -141,7 +153,7 @@
 
   <!-- Site Footer -->
   <footer class="site-footer">
-    <span>© 2026 MIKESTA · DESIGNED WITH LOVE</span>
+    <span>© 2026 MIKESTA · CRAFTED WITH PRIDE</span>
     <a href="index.html">Back to feed ↑</a>
   </footer>
 

@@ -1,10 +1,11 @@
 /**
- * Mikesta — Client Application Core
- * Features: State persistence, themes, stories viewer, audio synth,
- * double-tap heart burst, photo filters, live search, inline comments, lightbox.
+ * Mikesta — Professional-Grade Client Application Engine
+ * Architecture: State persistence, multi-vibe themes, immersive stories viewer,
+ * story creator studio, camera EXIF inspector, direct messages (DM) with simulated chat,
+ * command palette (Cmd+K), post reaction dock, fine-tuning adjustments, and keyboard navigation.
  */
 
-// Helper selectors
+// Core DOM helpers
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const on = (element, event, handler, options) => element?.addEventListener(event, handler, options);
@@ -12,7 +13,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => 
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 }[char]));
 
-const STORAGE_KEY = 'mikesta-state-v3';
+const STORAGE_KEY = 'mikesta-state-v4';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 // Default initial state
@@ -25,6 +26,7 @@ const defaultState = {
     'post-1': {
       likes: 1235,
       commentCount: 46,
+      reaction: '❤️',
       comments: [
         { username: 'ava.studio', text: 'This morning light is unreal.' },
         { username: 'sam.builds', text: 'Rockaway is magic at this hour.' }
@@ -33,6 +35,7 @@ const defaultState = {
     'post-2': {
       likes: 856,
       commentCount: 23,
+      reaction: '❤️',
       comments: [
         { username: 'travel.adventures', text: 'Alfama neighborhood has the best secret stairs.' },
         { username: 'priya.makes', text: 'Adding this to my wanderlust list!' }
@@ -41,6 +44,7 @@ const defaultState = {
     'post-3': {
       likes: 642,
       commentCount: 18,
+      reaction: '❤️',
       comments: [
         { username: 'mike.photos', text: 'Love the stillness in this frame.' },
         { username: 'nora.eats', text: 'The natural clay tones are so calming.' }
@@ -49,6 +53,7 @@ const defaultState = {
     'post-4': {
       likes: 1049,
       commentCount: 31,
+      reaction: '❤️',
       comments: [
         { username: 'maya.moves', text: 'Cedar air is pure medicine.' },
         { username: 'chris.cole', text: 'Incredible canopy scale!' }
@@ -57,9 +62,25 @@ const defaultState = {
   },
   feed: 'Following',
   activeTag: 'all',
+  activeSavedCategory: 'all',
   theme: 'paper',
   soundEnabled: true,
   unreadNotifications: 3,
+  unreadMessages: 1,
+  myStory: null, // Custom user story
+  chatMessages: {
+    'ava.studio': [
+      { sender: 'them', text: 'That Rockaway photo is unreal! What lens did you shoot it on?', time: '10:42 AM' },
+      { sender: 'me', text: 'Thanks Ava! Shot it on the 35mm Summilux right before the day got loud.', time: '10:45 AM' },
+      { sender: 'them', text: 'The subtle blue gradient is perfection. Let me know if you swing by Greenpoint this weekend!', time: '10:48 AM' }
+    ],
+    'sam.builds': [
+      { sender: 'them', text: 'Working on a new timber desk setup today, stop by anytime for espresso.', time: 'Yesterday' }
+    ],
+    'maya.moves': [
+      { sender: 'them', text: 'Caught sunrise over the Hudson Valley ridge line today ✨', time: 'Yesterday' }
+    ]
+  },
   profile: {
     name: 'Mike Anderson',
     bio: 'Developer, creator, and collector of small beautiful moments.\nBuilding Mikesta in public.',
@@ -76,6 +97,7 @@ function loadState() {
       ...stored,
       posts: Array.isArray(stored.posts) ? stored.posts : [],
       postStats: (stored.postStats && typeof stored.postStats === 'object') ? stored.postStats : defaultState.postStats,
+      chatMessages: stored.chatMessages || defaultState.chatMessages,
       profile: { ...defaultState.profile, ...(stored.profile || {}) }
     };
   } catch {
@@ -95,7 +117,7 @@ const saveState = () => {
 
 /* ==========================================================================
    Tactile Web Audio Synthesizer
-   Zero dependencies; gentle pops and camera shutter sounds.
+   Zero dependencies; gentle pitch sweeps, shutter clicks, and message chimes.
    ========================================================================== */
 class SoundEngine {
   constructor() {
@@ -119,8 +141,8 @@ class SoundEngine {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(360, now);
-      osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+      osc.frequency.setValueAtTime(380, now);
+      osc.frequency.exponentialRampToValueAtTime(820, now + 0.08);
       gain.gain.setValueAtTime(0.12, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
       osc.connect(gain);
@@ -138,8 +160,8 @@ class SoundEngine {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(1040, now + 0.12);
+      osc.frequency.setValueAtTime(540, now);
+      osc.frequency.exponentialRampToValueAtTime(1080, now + 0.12);
       gain.gain.setValueAtTime(0.14, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
       osc.connect(gain);
@@ -165,6 +187,26 @@ class SoundEngine {
       gain.connect(this.ctx.destination);
       osc.start(now);
       osc.stop(now + 0.09);
+    } catch {}
+  }
+  chime() {
+    if (!state.soundEnabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      [660, 880].forEach((freq, i) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + (i * 0.08));
+        gain.gain.setValueAtTime(0.1, now + (i * 0.08));
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.08) + 0.15);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + (i * 0.08));
+        osc.stop(now + (i * 0.08) + 0.15);
+      });
     } catch {}
   }
 }
@@ -222,6 +264,15 @@ function applyTheme(themeId) {
   }
 }
 
+function cycleTheme() {
+  const currentIdx = THEMES.findIndex((t) => t.id === state.theme);
+  const nextIdx = (currentIdx + 1) % THEMES.length;
+  const next = THEMES[nextIdx];
+  applyTheme(next.id);
+  announce(`Vibe set to ${next.label}.`, 'success');
+  sounds.pop();
+}
+
 function showThemeMenu() {
   const menu = document.createElement('div');
   menu.className = 'choice-list';
@@ -236,7 +287,7 @@ function showThemeMenu() {
     });
     menu.appendChild(item);
   });
-  openDialog('Choose your vibe', menu, 'Aesthetic');
+  openDialog('Choose your aesthetic vibe', menu, 'Aesthetic');
 }
 
 /* ==========================================================================
@@ -298,186 +349,743 @@ function makeButton(text, className = 'dialog-action', attributes = {}) {
 }
 
 /* ==========================================================================
-   Post Data & Stats
+   Camera EXIF Metadata Registry
    ========================================================================== */
-function getPostId(post) {
-  return post?.dataset.postId || $('.username', post)?.textContent?.trim() || 'post';
-}
+const POST_EXIF = {
+  'post-1': {
+    camera: 'Leica M11',
+    lens: 'Summilux-M 35mm f/1.4 ASPH',
+    shutter: '1/500s',
+    aperture: 'f/2.8',
+    iso: 'ISO 200',
+    profile: 'Leica Warm Classic',
+    light: 'Golden Hour (30m before dusk)'
+  },
+  'post-2': {
+    camera: 'Fujifilm X100V',
+    lens: 'Fujinon 23mm f/2.0 Fixed',
+    shutter: '1/250s',
+    aperture: 'f/4.0',
+    iso: 'ISO 160',
+    profile: 'Classic Negative Recipe',
+    light: 'Afternoon Sun over Lisbon'
+  },
+  'post-3': {
+    camera: 'Hasselblad 907X',
+    lens: 'XCD 45mm f/4 P',
+    shutter: '1/125s',
+    aperture: 'f/2.8',
+    iso: 'ISO 400',
+    profile: 'Natural Ceramic Warmth',
+    light: 'Diffused Morning Studio North Light'
+  },
+  'post-4': {
+    camera: 'Sony A7 IV',
+    lens: 'FE 24-70mm f/2.8 GM II',
+    shutter: '1/320s',
+    aperture: 'f/2.8',
+    iso: 'ISO 100',
+    profile: 'Natural Forest Standard',
+    light: 'Filtered Sunlight through Redwoods'
+  }
+};
 
-function getPostStats(post) {
-  const id = getPostId(post);
-  const likesText = $('.likes-count strong', post)?.textContent || '0';
-  const commentsText = $('.view-comments', post)?.textContent || '0';
-  const existing = state.postStats[id] || {};
-  const stats = state.postStats[id] = {
-    likes: Number.isFinite(existing.likes) ? existing.likes : (Number(likesText.replace(/\D/g, '')) || 0),
-    comments: Array.isArray(existing.comments) ? existing.comments : [],
-    commentCount: Number.isFinite(existing.commentCount) ? existing.commentCount : (Number(commentsText.replace(/\D/g, '')) || 0),
+function showExifDetails(postId) {
+  const exif = POST_EXIF[postId] || {
+    camera: '35mm Film Camera',
+    lens: 'Prime 40mm Lens',
+    shutter: '1/250s',
+    aperture: 'f/2.8',
+    iso: 'ISO 200',
+    profile: 'Mikesta Analog Filter',
+    light: 'Natural Ambient'
   };
-  return stats;
-}
 
-function updatePostCounts(post, stats) {
-  const likes = $('.likes-count strong', post);
-  const comments = $('.view-comments', post);
-  if (likes) likes.textContent = `${stats.likes.toLocaleString()} likes`;
-  if (comments) comments.textContent = `View all ${stats.commentCount} comments`;
-
-  // Render recent preview comments if container exists
-  const preview = $('.post-recent-comments', post);
-  if (preview && stats.comments.length) {
-    const recent = stats.comments.slice(-2);
-    preview.innerHTML = recent.map((c) => `
-      <div class="comment-item">
-        <strong>${escapeHtml(c.username)}</strong>
-        <span>${escapeHtml(c.text)}</span>
-      </div>
-    `).join('');
-  }
-}
-
-/* ==========================================================================
-   Feed Switching & Hashtag Filtering
-   ========================================================================== */
-function showFeedMenu(button) {
-  const menu = document.createElement('div');
-  menu.className = 'choice-list';
-  ['Following', 'For you', 'Recent'].forEach((option) => {
-    const item = makeButton(`${option}${state.feed === option ? '  ✓' : ''}`, 'choice-item', { type: 'button' });
-    on(item, 'click', () => {
-      state.feed = option;
-      saveState();
-      button.innerHTML = `${option} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>`;
-      closeDialog();
-      applyFeedFilter(option);
-      announce(`Feed set to ${option}.`);
-    });
-    menu.appendChild(item);
-  });
-  openDialog('Choose your feed', menu, 'View');
-}
-
-function applyFeedFilter(feedType) {
-  const posts = $$('.feed-section .post-card');
-  posts.forEach((card, idx) => {
-    card.style.display = 'block';
-    if (feedType === 'Following') {
-      const username = $('.username', card)?.textContent?.trim();
-      const isFollowing = state.followedUsers.includes(username) || username === 'mike.photos';
-      // In following mode, show followed users and user posts first
-      card.style.opacity = '1';
-    } else if (feedType === 'Recent') {
-      // Keep natural order (newest first)
-      card.style.opacity = '1';
-    }
-  });
-}
-
-function setupTagFilter() {
-  const tags = $$('.tag-pill');
-  tags.forEach((tag) => {
-    on(tag, 'click', () => {
-      tags.forEach((t) => t.classList.remove('active'));
-      tag.classList.add('active');
-      const selected = tag.dataset.tag || 'all';
-      state.activeTag = selected;
-      filterFeedByTag(selected);
-      sounds.pop();
-    });
-  });
-}
-
-function filterFeedByTag(tag) {
-  const posts = $$('.feed-section .post-card');
-  let matched = 0;
-  posts.forEach((post) => {
-    const postTags = (post.dataset.tags || '').toLowerCase();
-    const text = post.textContent.toLowerCase();
-    if (tag === 'all' || postTags.includes(tag) || text.includes(tag)) {
-      post.style.display = 'block';
-      post.style.animation = 'fadeIn 0.3s ease';
-      matched += 1;
-    } else {
-      post.style.display = 'none';
-    }
-  });
-  if (tag !== 'all') {
-    announce(`Showing ${matched} moment${matched === 1 ? '' : 's'} for #${tag}.`);
-  }
-}
-
-/* ==========================================================================
-   Double-Click to Like with Heart Burst
-   ========================================================================== */
-function setupHeartBurst(post) {
-  const imageBox = $('.post-image', post);
-  if (!imageBox) return;
-
-  let lastTap = 0;
-  on(imageBox, 'click', (event) => {
-    const now = Date.now();
-    const delta = now - lastTap;
-    if (delta < 300 && delta > 0) {
-      // Double tap detected!
-      triggerHeartBurst(post, event);
-      const likeBtn = $('.like-btn', post);
-      if (likeBtn && !likeBtn.classList.contains('liked')) {
-        handleLike(likeBtn);
-      } else {
-        sounds.pop();
-      }
-    }
-    lastTap = now;
-  });
-}
-
-function triggerHeartBurst(post, event) {
-  const imageBox = $('.post-image', post);
-  if (!imageBox) return;
-  const burst = document.createElement('div');
-  burst.className = 'heart-burst';
-  burst.innerHTML = '<i class="fa-solid fa-heart"></i>';
-  imageBox.appendChild(burst);
+  const body = document.createElement('div');
+  body.className = 'exif-popover';
+  body.innerHTML = `
+    <div class="exif-row"><span class="exif-label">Camera</span><span class="exif-val">${escapeHtml(exif.camera)}</span></div>
+    <div class="exif-row"><span class="exif-label">Lens</span><span class="exif-val">${escapeHtml(exif.lens)}</span></div>
+    <div class="exif-row"><span class="exif-label">Exposure</span><span class="exif-val">${exif.shutter} · ${exif.aperture} · ${exif.iso}</span></div>
+    <div class="exif-row"><span class="exif-label">Atmosphere</span><span class="exif-val">${escapeHtml(exif.profile)}</span></div>
+    <div class="exif-row"><span class="exif-label">Lighting</span><span class="exif-val">${escapeHtml(exif.light)}</span></div>
+  `;
+  openDialog('Exposure & Camera Details', body, 'EXIF Data');
   sounds.pop();
-  setTimeout(() => burst.remove(), 850);
 }
 
 /* ==========================================================================
-   Inline Commenting on Feed Cards
+   Creator Directory & Creator Profile Modal
    ========================================================================== */
-function setupInlineCommentForms() {
-  $$('.post-card').forEach((post) => {
-    const form = $('.inline-comment-form', post);
-    if (!form || form.dataset.bound) return;
-    form.dataset.bound = 'true';
+const CREATORS_DATA = {
+  'ava.studio': {
+    name: 'Ava Lin',
+    avatar: 'https://i.pravatar.cc/150?img=1',
+    bio: 'Architectural ceramicist & visual collector in Greenpoint, Brooklyn. Investigating quiet forms, tactile earthenware, and soft shadow studies.',
+    location: 'Brooklyn, NY',
+    followers: '3.4k',
+    following: '412',
+    moments: 38,
+    photos: [
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  'travel.adventures': {
+    name: 'Elena Rostova',
+    avatar: 'https://i.pravatar.cc/150?img=8',
+    bio: 'Slow traveler and documentary photographer. Tracking cobblestone alleyways, terracotta facades, and yellow trams across Southern Europe.',
+    location: 'Lisbon, Portugal',
+    followers: '5.1k',
+    following: '389',
+    moments: 52,
+    photos: [
+      'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  'sam.builds': {
+    name: 'Samir Patel',
+    avatar: 'https://i.pravatar.cc/150?img=5',
+    bio: 'Systems engineer & studio builder in Manhattan. Focused on warm timber furniture, ambient lighting, and quiet software.',
+    location: 'New York, NY',
+    followers: '2.8k',
+    following: '254',
+    moments: 29,
+    photos: [
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  'maya.moves': {
+    name: 'Maya Santos',
+    avatar: 'https://i.pravatar.cc/150?img=2',
+    bio: 'Dancer, movement researcher, and dawn patrol chaser in Hudson Valley. Catching early light as it cuts through morning fog.',
+    location: 'Hudson Valley, NY',
+    followers: '4.2k',
+    following: '310',
+    moments: 44,
+    photos: [
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  'nora.eats': {
+    name: 'Nora Vance',
+    avatar: 'https://i.pravatar.cc/150?img=4',
+    bio: 'Artisan baker & cookbook writer. Celebrating slow fermentation, heritage wheat, and kitchen sunlight.',
+    location: 'Portland, OR',
+    followers: '3.9k',
+    following: '290',
+    moments: 35,
+    photos: [
+      'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80'
+    ]
+  },
+  'priya.makes': {
+    name: 'Priya Shah',
+    avatar: 'https://i.pravatar.cc/100?img=13',
+    bio: 'Collector of mid-century chairs, tactile book covers, and coastal morning light.',
+    location: 'San Francisco, CA',
+    followers: '1.9k',
+    following: '180',
+    moments: 21,
+    photos: [
+      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=600&q=80'
+    ]
+  }
+};
 
-    const input = $('.inline-comment-input', form);
-    const btn = $('.inline-comment-btn', form);
+function showCreatorProfile(username) {
+  if (username === 'mike.photos') {
+    window.location.href = 'profile.html';
+    return;
+  }
+  const creator = CREATORS_DATA[username];
+  if (!creator) return;
 
-    on(input, 'input', () => {
-      if (btn) btn.disabled = !input.value.trim();
+  const isFollowing = state.followedUsers.includes(username);
+
+  let modal = $('#creatorModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'creatorModal';
+    modal.className = 'creator-sheet-modal';
+    modal.setAttribute('role', 'dialog');
+    document.body.appendChild(modal);
+    on(modal, 'click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
     });
+  }
 
-    on(form, 'submit', (event) => {
-      event.preventDefault();
-      const text = input.value.trim();
-      if (!text) return;
-      const stats = getPostStats(post);
-      stats.comments.push({ username: 'mike.photos', text });
-      stats.commentCount = Math.max(stats.commentCount + 1, stats.comments.length);
-      saveState();
-      updatePostCounts(post, stats);
-      input.value = '';
-      if (btn) btn.disabled = true;
-      sounds.pop();
-      announce('Comment posted.');
+  modal.innerHTML = `
+    <div class="creator-card">
+      <div class="creator-header">
+        <img src="${creator.avatar}" alt="${escapeHtml(creator.name)}" class="creator-avatar-large">
+        <div class="creator-header-info">
+          <h3>${escapeHtml(creator.name)} <i class="fa-solid fa-circle-check verified"></i></h3>
+          <span style="font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted);">${escapeHtml(username)} · ${escapeHtml(creator.location)}</span>
+          <div class="creator-stats-bar">
+            <span><strong>${creator.moments}</strong> moments</span>
+            <span><strong>${creator.followers}</strong> circle</span>
+            <span><strong>${creator.following}</strong> following</span>
+          </div>
+        </div>
+      </div>
+      <div class="creator-bio-box">
+        <p style="margin: 0;">${escapeHtml(creator.bio)}</p>
+      </div>
+      <div class="creator-actions-row">
+        <button type="button" class="dialog-action follow-creator-btn" style="flex: 1; ${isFollowing ? 'background: var(--line); color: var(--ink);' : ''}">
+          ${isFollowing ? 'Following' : 'Follow circle'}
+        </button>
+        <button type="button" class="button-outline message-creator-btn" style="flex: 1;">
+          <i class="fa-regular fa-paper-plane"></i> Send message
+        </button>
+      </div>
+      <div class="creator-grid">
+        ${creator.photos.map((src) => `<img src="${src}" alt="Moment by ${escapeHtml(username)}">`).join('')}
+      </div>
+    </div>
+  `;
+
+  modal.classList.add('active');
+  sounds.pop();
+
+  const followBtn = $('.follow-creator-btn', modal);
+  on(followBtn, 'click', () => {
+    const following = state.followedUsers.includes(username);
+    if (following) {
+      state.followedUsers = state.followedUsers.filter((u) => u !== username);
+      followBtn.textContent = 'Follow circle';
+      followBtn.style.background = 'var(--accent)';
+      followBtn.style.color = '#ffffff';
+      announce(`Unfollowed ${username}.`);
+    } else {
+      state.followedUsers.push(username);
+      followBtn.textContent = 'Following';
+      followBtn.style.background = 'var(--line)';
+      followBtn.style.color = 'var(--ink)';
+      announce(`Following ${username}.`, 'success');
+    }
+    saveState();
+    sounds.pop();
+    // Update any matching follow buttons in sidebar
+    $$('.suggestion-item').forEach((item) => {
+      if ($('.suggestion-username', item)?.textContent === username) {
+        const btn = $('.follow-btn', item);
+        btn.classList.toggle('following', !following);
+        btn.textContent = !following ? 'Following' : 'Follow';
+      }
+    });
+  });
+
+  const msgBtn = $('.message-creator-btn', modal);
+  on(msgBtn, 'click', () => {
+    modal.classList.remove('active');
+    openChatWithUser(username);
+  });
+
+  $$('.creator-grid img', modal).forEach((img) => {
+    on(img, 'click', () => {
+      openLightbox({
+        image: img.src,
+        username: username,
+        avatar: creator.avatar,
+        location: creator.location,
+        caption: 'Captured moment on Mikesta.'
+      });
     });
   });
 }
 
 /* ==========================================================================
-   Like, Save, Share & Post Menus
+   Direct Messages (Chat) Drawer
    ========================================================================== */
+let activeChatUser = null;
+
+function ensureChatDrawer() {
+  let drawer = $('#chatDrawer');
+  let overlay = $('#chatOverlay');
+  if (drawer && overlay) return { drawer, overlay };
+
+  overlay = document.createElement('div');
+  overlay.id = 'chatOverlay';
+  overlay.className = 'chat-overlay';
+  document.body.appendChild(overlay);
+
+  drawer = document.createElement('div');
+  drawer.id = 'chatDrawer';
+  drawer.className = 'chat-drawer';
+  drawer.innerHTML = `
+    <!-- Threads List View -->
+    <div class="chat-threads-view" id="chatThreadsView" style="display: flex; flex-direction: column; height: 100%;">
+      <div class="chat-header">
+        <h3>Direct Messages</h3>
+        <button class="dialog-close" id="closeChatBtn" aria-label="Close messages"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="chat-thread-list" id="chatThreadsList"></div>
+    </div>
+
+    <!-- Active Conversation View -->
+    <div class="chat-conversation-view" id="chatConvoView">
+      <div class="chat-convo-header">
+        <button class="chat-back-btn" id="chatBackBtn" aria-label="Back"><i class="fa-solid fa-arrow-left"></i></button>
+        <img src="" id="chatConvoAvatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+        <div>
+          <span id="chatConvoName" style="font-size: 13px; font-weight: 800; display: block;"></span>
+          <span style="font-size: 10px; color: #2a8f68;">● Active now</span>
+        </div>
+      </div>
+      <div class="chat-messages-container" id="chatMessages"></div>
+      <form class="chat-input-bar" id="chatForm">
+        <input type="text" id="chatInput" placeholder="Write a thoughtful note..." maxlength="240" autocomplete="off">
+        <button type="submit" class="chat-send-btn"><i class="fa-solid fa-arrow-up"></i></button>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(drawer);
+
+  on($('#closeChatBtn', drawer), 'click', closeChat);
+  on(overlay, 'click', closeChat);
+
+  on($('#chatBackBtn', drawer), 'click', () => {
+    $('#chatConvoView', drawer).classList.remove('active');
+    $('#chatThreadsView', drawer).style.display = 'flex';
+    renderChatThreads();
+  });
+
+  on($('#chatForm', drawer), 'submit', (e) => {
+    e.preventDefault();
+    const input = $('#chatInput', drawer);
+    const text = input.value.trim();
+    if (!text || !activeChatUser) return;
+
+    // Append outgoing message
+    state.chatMessages[activeChatUser] = state.chatMessages[activeChatUser] || [];
+    state.chatMessages[activeChatUser].push({ sender: 'me', text, time: 'Just now' });
+    saveState();
+    renderConversationMessages(activeChatUser);
+    input.value = '';
+    sounds.pop();
+
+    // Contextual auto-reply simulation
+    setTimeout(() => {
+      const replies = {
+        'ava.studio': [
+          'Love this thought! Next time you are in Brooklyn let’s definitely meet for coffee at Sey.',
+          'Totally agree. The texture in that photo was unreal.',
+          'Working on firing a new batch of stoneware today!'
+        ],
+        'sam.builds': [
+          'Agreed! Catching up soon.',
+          'Just finished routing the desk cables, looks so clean now.'
+        ],
+        'maya.moves': [
+          'Yes! The mist this morning was unbelievable.',
+          'Heading out for another shoot tomorrow dawn.'
+        ]
+      };
+      const possible = replies[activeChatUser] || ['Thanks for sharing this moment with me! ✨'];
+      const replyText = possible[Math.floor(Math.random() * possible.length)];
+
+      state.chatMessages[activeChatUser].push({ sender: 'them', text: replyText, time: 'Just now' });
+      saveState();
+      if ($('#chatConvoView').classList.contains('active')) {
+        renderConversationMessages(activeChatUser);
+      }
+      sounds.chime();
+    }, 1400);
+  });
+
+  return { drawer, overlay };
+}
+
+function openChat() {
+  const { drawer, overlay } = ensureChatDrawer();
+  const badge = $('#chatBadge');
+  if (badge) badge.style.display = 'none';
+  state.unreadMessages = 0;
+  saveState();
+
+  renderChatThreads();
+  $('#chatThreadsView', drawer).style.display = 'flex';
+  $('#chatConvoView', drawer).classList.remove('active');
+
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  sounds.pop();
+}
+
+function openChatWithUser(username) {
+  const { drawer, overlay } = ensureChatDrawer();
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  activeChatUser = username;
+
+  const creator = CREATORS_DATA[username] || { name: username, avatar: 'https://i.pravatar.cc/150?img=7' };
+  $('#chatConvoAvatar', drawer).src = creator.avatar;
+  $('#chatConvoName', drawer).textContent = creator.name;
+
+  $('#chatThreadsView', drawer).style.display = 'none';
+  $('#chatConvoView', drawer).classList.add('active');
+
+  renderConversationMessages(username);
+  $('#chatInput', drawer).focus();
+  sounds.pop();
+}
+
+function closeChat() {
+  $('#chatDrawer')?.classList.remove('open');
+  $('#chatOverlay')?.classList.remove('open');
+}
+
+function renderChatThreads() {
+  const list = $('#chatThreadsList');
+  if (!list) return;
+
+  const threads = Object.keys(state.chatMessages);
+  list.innerHTML = threads.map((user) => {
+    const creator = CREATORS_DATA[user] || { name: user, avatar: 'https://i.pravatar.cc/150?img=1' };
+    const msgs = state.chatMessages[user] || [];
+    const lastMsg = msgs[msgs.length - 1] || { text: 'Start a conversation', time: '' };
+
+    return `
+      <div class="chat-thread-item" data-user="${escapeHtml(user)}">
+        <img src="${creator.avatar}" alt="${escapeHtml(creator.name)}" class="chat-thread-avatar">
+        <div class="chat-thread-content">
+          <div class="chat-thread-top">
+            <span class="chat-thread-name">${escapeHtml(creator.name)}</span>
+            <span class="chat-thread-time">${escapeHtml(lastMsg.time)}</span>
+          </div>
+          <p class="chat-thread-snippet">${escapeHtml(lastMsg.text)}</p>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  $$('.chat-thread-item', list).forEach((item) => {
+    on(item, 'click', () => {
+      openChatWithUser(item.dataset.user);
+    });
+  });
+}
+
+function renderConversationMessages(username) {
+  const container = $('#chatMessages');
+  if (!container) return;
+
+  const msgs = state.chatMessages[username] || [];
+  container.innerHTML = msgs.map((m) => `
+    <div class="chat-bubble ${m.sender === 'me' ? 'outgoing' : 'incoming'}">
+      ${escapeHtml(m.text)}
+    </div>
+  `).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+/* ==========================================================================
+   Story Creator Studio (Dedicated Add-to-Story Flow)
+   ========================================================================== */
+const STORY_GRADIENTS = [
+  'linear-gradient(135deg, #f1d879, #e76f51)',
+  'linear-gradient(135deg, #3a1c71, #d76d77, #ffaf7b)',
+  'linear-gradient(135deg, #134e5e, #71b280)',
+  'linear-gradient(135deg, #0f2027, #203a43, #2c5364)',
+  'linear-gradient(135deg, #ff758c, #ff7eb3)'
+];
+
+const STORY_STICKERS = [
+  '📍 New York, NY',
+  '☕️ 8:15 AM',
+  '✨ Current mood',
+  '🎧 Boards of Canada',
+  '🎞 35mm Portra'
+];
+
+let currentStoryGradient = STORY_GRADIENTS[0];
+let currentStorySticker = STORY_STICKERS[0];
+let currentStoryImage = null;
+
+function openStoryCreator() {
+  let modal = $('#storyCreatorModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'storyCreatorModal';
+    modal.className = 'modal';
+    modal.setAttribute('role', 'dialog');
+    modal.innerHTML = `
+      <div class="story-creator-card">
+        <div class="story-creator-preview" id="storyPreviewBox">
+          <img id="storyPreviewImg" src="" alt="">
+          <span class="story-creator-text" id="storyPreviewText">Sharing a quiet moment...</span>
+          <span class="story-creator-sticker" id="storyPreviewSticker">${STORY_STICKERS[0]}</span>
+        </div>
+        <div class="story-creator-controls">
+          <input type="text" id="storyTextInput" placeholder="Add text to your story..." maxlength="80" style="padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px;">
+          <div>
+            <span class="kicker" style="font-size: 9px;">Atmospheric Gradient</span>
+            <div class="gradient-options" id="storyGradientList"></div>
+          </div>
+          <div>
+            <span class="kicker" style="font-size: 9px;">Story Sticker</span>
+            <div class="sticker-options" id="storyStickerList"></div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+            <button type="button" class="cancel-btn" id="closeStoryCreator">Cancel</button>
+            <button type="button" class="dialog-action" id="publishStoryBtn">Share to your story ✨</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    on($('#closeStoryCreator', modal), 'click', () => {
+      modal.classList.remove('active');
+      document.body.classList.remove('dialog-open');
+    });
+
+    on($('#storyTextInput', modal), 'input', (e) => {
+      const val = e.target.value.trim() || 'Sharing a quiet moment...';
+      $('#storyPreviewText', modal).textContent = val;
+    });
+
+    // Populate gradients
+    const gradList = $('#storyGradientList', modal);
+    gradList.innerHTML = STORY_GRADIENTS.map((g, i) => `
+      <button type="button" class="gradient-dot ${i === 0 ? 'active' : ''}" style="background: ${g};" data-grad="${g}"></button>
+    `).join('');
+    $$('.gradient-dot', gradList).forEach((dot) => {
+      on(dot, 'click', () => {
+        $$('.gradient-dot', gradList).forEach((d) => d.classList.remove('active'));
+        dot.classList.add('active');
+        currentStoryGradient = dot.dataset.grad;
+        $('#storyPreviewBox', modal).style.background = currentStoryGradient;
+        sounds.pop();
+      });
+    });
+
+    // Populate stickers
+    const stickList = $('#storyStickerList', modal);
+    stickList.innerHTML = STORY_STICKERS.map((s, i) => `
+      <button type="button" class="sticker-chip ${i === 0 ? 'active' : ''}" data-sticker="${escapeHtml(s)}">${escapeHtml(s)}</button>
+    `).join('');
+    $$('.sticker-chip', stickList).forEach((chip) => {
+      on(chip, 'click', () => {
+        $$('.sticker-chip', stickList).forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentStorySticker = chip.dataset.sticker;
+        $('#storyPreviewSticker', modal).textContent = currentStorySticker;
+        sounds.pop();
+      });
+    });
+
+    on($('#publishStoryBtn', modal), 'click', () => {
+      const captionText = $('#storyTextInput', modal).value.trim() || 'A small moment worth keeping.';
+      // Add as custom story in STORIES_DATA
+      state.myStory = {
+        id: 'story-mike',
+        username: 'mike.photos',
+        avatar: state.profile.avatar,
+        image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=85',
+        time: 'Just now',
+        location: currentStorySticker,
+        caption: captionText
+      };
+      saveState();
+
+      // Update "Your story" avatar in the rail
+      const myStoryItem = $('.story-item.story-add');
+      if (myStoryItem) {
+        myStoryItem.classList.remove('story-add');
+        const badge = $('b', myStoryItem);
+        if (badge) badge.style.display = 'none';
+      }
+
+      modal.classList.remove('active');
+      document.body.classList.remove('dialog-open');
+      sounds.reaction();
+      announce('Added to your story ✨', 'success');
+    });
+  }
+
+  modal.classList.add('active');
+  document.body.classList.add('dialog-open');
+  sounds.pop();
+}
+
+/* ==========================================================================
+   Command Palette & Keyboard Shortcuts
+   ========================================================================== */
+const COMMANDS = [
+  { key: 'N', label: 'Create new post', action: () => window.openUploadModal?.() },
+  { key: 'D', label: 'Open Direct Messages', action: () => openChat() },
+  { key: 'T', label: 'Cycle aesthetic vibe (theme)', action: () => cycleTheme() },
+  { key: 'M', label: 'Toggle sound effects', action: () => toggleSound() },
+  { key: 'P', label: 'Go to your profile', action: () => window.location.href = 'profile.html' },
+  { key: 'H', label: 'Go to home feed', action: () => window.location.href = 'index.html' },
+  { key: 'S', label: 'Create new story', action: () => openStoryCreator() },
+  { key: '1', label: 'Filter: #coast', action: () => filterFeedByTag('coast') },
+  { key: '2', label: 'Filter: #architecture', action: () => filterFeedByTag('architecture') },
+  { key: '3', label: 'Filter: #nature', action: () => filterFeedByTag('nature') }
+];
+
+function toggleCommandPalette() {
+  let backdrop = $('#commandPaletteBackdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'commandPaletteBackdrop';
+    backdrop.className = 'command-palette-backdrop';
+    backdrop.innerHTML = `
+      <div class="command-palette">
+        <div class="command-input-row">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="commandSearch" placeholder="Type a command or shortcut (e.g. theme, post, DM)..." autocomplete="off">
+          <span class="kbd-badge">ESC to exit</span>
+        </div>
+        <div class="command-list" id="commandList"></div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    on(backdrop, 'click', (e) => {
+      if (e.target === backdrop) backdrop.classList.remove('active');
+    });
+
+    const searchInput = $('#commandSearch', backdrop);
+    on(searchInput, 'input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      renderCommands(q);
+    });
+  }
+
+  const renderCommands = (filter = '') => {
+    const list = $('#commandList', backdrop);
+    const filtered = COMMANDS.filter((c) => !filter || c.label.toLowerCase().includes(filter));
+    list.innerHTML = filtered.map((c, i) => `
+      <button type="button" class="command-item" data-idx="${i}">
+        <span class="command-item-left">
+          <i class="fa-solid fa-terminal" style="font-size: 11px; color: var(--accent);"></i>
+          ${escapeHtml(c.label)}
+        </span>
+        <span class="kbd-badge">${escapeHtml(c.key)}</span>
+      </button>
+    `).join('');
+
+    $$('.command-item', list).forEach((item) => {
+      on(item, 'click', () => {
+        backdrop.classList.remove('active');
+        const idx = Number(item.dataset.idx);
+        filtered[idx]?.action();
+      });
+    });
+  };
+
+  renderCommands('');
+  backdrop.classList.toggle('active');
+  if (backdrop.classList.contains('active')) {
+    $('#commandSearch', backdrop).value = '';
+    $('#commandSearch', backdrop).focus();
+    sounds.pop();
+  }
+}
+
+function toggleSound() {
+  state.soundEnabled = !state.soundEnabled;
+  saveState();
+  const soundBtn = $('#soundBtn');
+  if (soundBtn) {
+    soundBtn.classList.toggle('muted', !state.soundEnabled);
+    soundBtn.innerHTML = state.soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
+  }
+  if (state.soundEnabled) sounds.pop();
+  announce(state.soundEnabled ? 'Audio vibes on.' : 'Audio vibes muted.');
+}
+
+/* ==========================================================================
+   Feed Post Actions & Emoji Reaction Dock
+   ========================================================================== */
+function setupReactionDocks() {
+  $$('.post-card').forEach((card) => {
+    const likeBtn = $('.like-btn', card);
+    if (!likeBtn || likeBtn.dataset.dockBound) return;
+    likeBtn.dataset.dockBound = 'true';
+
+    // Create floating reaction dock
+    const dock = document.createElement('div');
+    dock.className = 'reaction-dock';
+    dock.innerHTML = `
+      <button type="button" class="reaction-dock-item" data-reaction="❤️">❤️</button>
+      <button type="button" class="reaction-dock-item" data-reaction="🔥">🔥</button>
+      <button type="button" class="reaction-dock-item" data-reaction="✨">✨</button>
+      <button type="button" class="reaction-dock-item" data-reaction="👏">👏</button>
+      <button type="button" class="reaction-dock-item" data-reaction="☕️">☕️</button>
+    `;
+    likeBtn.parentElement.style.position = 'relative';
+    likeBtn.parentElement.appendChild(dock);
+
+    let hoverTimer = null;
+    on(likeBtn, 'mouseenter', () => {
+      hoverTimer = setTimeout(() => dock.classList.add('visible'), 300);
+    });
+    on(likeBtn.parentElement, 'mouseleave', () => {
+      clearTimeout(hoverTimer);
+      dock.classList.remove('visible');
+    });
+
+    $$('.reaction-dock-item', dock).forEach((item) => {
+      on(item, 'click', (e) => {
+        e.stopPropagation();
+        const reaction = item.dataset.reaction;
+        applyPostReaction(card, reaction);
+        dock.classList.remove('visible');
+      });
+    });
+  });
+}
+
+function applyPostReaction(post, reaction) {
+  const postId = getPostId(post);
+  const stats = getPostStats(post);
+  stats.reaction = reaction;
+  stats.likes += 1;
+  saveState();
+  updatePostCounts(post, stats);
+
+  const likeBtn = $('.like-btn', post);
+  likeBtn.classList.add('liked');
+  likeBtn.innerHTML = `<span>${reaction}</span>`;
+  triggerHeartBurst(post);
+  sounds.reaction();
+  announce(`Reacted with ${reaction}!`);
+}
+
 function handleLike(button) {
   const post = button.closest('.post-card');
   if (!post) return;
@@ -485,15 +1093,18 @@ function handleLike(button) {
   const stats = getPostStats(post);
   const liked = button.classList.toggle('liked');
   button.setAttribute('aria-pressed', String(liked));
-  const icon = $('i', button);
-  icon?.classList.toggle('fa-regular', !liked);
-  icon?.classList.toggle('fa-solid', liked);
 
   state.likedPosts = liked ? [...new Set([...state.likedPosts, postId])] : state.likedPosts.filter((id) => id !== postId);
   stats.likes = liked ? stats.likes + 1 : Math.max(0, stats.likes - 1);
   updatePostCounts(post, stats);
   state.postStats[postId] = stats;
   saveState();
+
+  if (liked) {
+    button.innerHTML = '<i class="fa-solid fa-heart" style="color: var(--accent);"></i>';
+  } else {
+    button.innerHTML = '<i class="fa-regular fa-heart"></i>';
+  }
 
   button.animate?.([
     { transform: 'scale(1)' },
@@ -523,41 +1134,32 @@ function handleSave(button) {
 }
 
 function handleShare(post) {
-  const username = $('.username', post)?.textContent?.trim() || 'this post';
+  const username = $('.username', post)?.textContent?.trim() || 'this moment';
   const postUrl = window.location.href;
-
-  if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
-    navigator.share({
-      title: `${username} on Mikesta`,
-      text: `Check out this moment by ${username} on Mikesta!`,
-      url: postUrl,
-    }).catch(() => {});
-    return;
-  }
 
   const body = document.createElement('div');
   body.className = 'share-panel';
   body.innerHTML = `
-    <p>Share <strong>${escapeHtml(username)}</strong>'s moment with someone who would love it.</p>
+    <p>Share <strong>${escapeHtml(username)}</strong>'s moment with someone who would appreciate it.</p>
     <div class="share-options">
       <button type="button" data-share="copy"><i class="fa-solid fa-link"></i> Copy link</button>
-      <button type="button" data-share="message"><i class="fa-regular fa-paper-plane"></i> Send in chat</button>
+      <button type="button" data-share="dm"><i class="fa-regular fa-paper-plane"></i> Send in chat</button>
     </div>
   `;
   $$('.share-options button', body).forEach((btn) => {
     on(btn, 'click', async () => {
       const type = btn.dataset.share;
+      closeDialog();
       if (type === 'copy') {
         try {
           await navigator.clipboard.writeText(postUrl);
-          announce('Link copied to clipboard.', 'success');
+          announce('Moment link copied to clipboard.', 'success');
         } catch {
-          announce('Link ready to copy from your browser.');
+          announce('Link ready to copy from your browser bar.');
         }
       } else {
-        announce(`Direct message draft created.`);
+        openChat();
       }
-      closeDialog();
       sounds.pop();
     });
   });
@@ -577,7 +1179,7 @@ function showComments(post) {
         <span>${escapeHtml(c.text)}</span>
       </div>
     `).join('');
-    return list || '<p class="comment-summary">No comments yet. Be the first!</p>';
+    return list || '<p class="comment-summary">No comments yet. Start the conversation!</p>';
   };
 
   comments.innerHTML = `
@@ -607,12 +1209,18 @@ function showComments(post) {
 }
 
 function showPostMenu(post) {
+  const postId = getPostId(post);
   const menu = document.createElement('div');
   menu.className = 'choice-list';
+  const exif = makeButton('Inspect camera & exposure data (EXIF)', 'choice-item');
   const copy = makeButton('Copy link to moment', 'choice-item');
   const mute = makeButton('Mute this creator', 'choice-item');
   const report = makeButton('Report inappropriate content', 'choice-item danger');
 
+  on(exif, 'click', () => {
+    closeDialog();
+    showExifDetails(postId);
+  });
   on(copy, 'click', async () => {
     try {
       await navigator.clipboard.writeText(location.href);
@@ -631,8 +1239,105 @@ function showPostMenu(post) {
     announce('Thanks for helping keep Mikesta welcoming.', 'success');
   });
 
-  menu.append(copy, mute, report);
+  menu.append(exif, copy, mute, report);
   openDialog('Post options', menu, 'Manage');
+}
+
+function getPostId(post) {
+  return post?.dataset.postId || $('.username', post)?.textContent?.trim() || 'post';
+}
+
+function getPostStats(post) {
+  const id = getPostId(post);
+  const likesText = $('.likes-count strong', post)?.textContent || '0';
+  const commentsText = $('.view-comments', post)?.textContent || '0';
+  const existing = state.postStats[id] || {};
+  const stats = state.postStats[id] = {
+    likes: Number.isFinite(existing.likes) ? existing.likes : (Number(likesText.replace(/\D/g, '')) || 0),
+    comments: Array.isArray(existing.comments) ? existing.comments : [],
+    commentCount: Number.isFinite(existing.commentCount) ? existing.commentCount : (Number(commentsText.replace(/\D/g, '')) || 0),
+  };
+  return stats;
+}
+
+function updatePostCounts(post, stats) {
+  const likes = $('.likes-count strong', post);
+  const comments = $('.view-comments', post);
+  if (likes) likes.textContent = `${stats.likes.toLocaleString()} likes`;
+  if (comments) comments.textContent = `View all ${stats.commentCount} comments`;
+
+  const preview = $('.post-recent-comments', post);
+  if (preview && stats.comments.length) {
+    const recent = stats.comments.slice(-2);
+    preview.innerHTML = recent.map((c) => `
+      <div class="comment-item">
+        <strong>${escapeHtml(c.username)}</strong>
+        <span>${escapeHtml(c.text)}</span>
+      </div>
+    `).join('');
+  }
+}
+
+function setupHeartBurst(post) {
+  const imageBox = $('.post-image', post);
+  if (!imageBox) return;
+
+  let lastTap = 0;
+  on(imageBox, 'click', (event) => {
+    const now = Date.now();
+    const delta = now - lastTap;
+    if (delta < 300 && delta > 0) {
+      triggerHeartBurst(post);
+      const likeBtn = $('.like-btn', post);
+      if (likeBtn && !likeBtn.classList.contains('liked')) {
+        handleLike(likeBtn);
+      } else {
+        sounds.pop();
+      }
+    }
+    lastTap = now;
+  });
+}
+
+function triggerHeartBurst(post) {
+  const imageBox = $('.post-image', post);
+  if (!imageBox) return;
+  const burst = document.createElement('div');
+  burst.className = 'heart-burst';
+  burst.innerHTML = '<i class="fa-solid fa-heart"></i>';
+  imageBox.appendChild(burst);
+  sounds.pop();
+  setTimeout(() => burst.remove(), 850);
+}
+
+function setupInlineCommentForms() {
+  $$('.post-card').forEach((post) => {
+    const form = $('.inline-comment-form', post);
+    if (!form || form.dataset.bound) return;
+    form.dataset.bound = 'true';
+
+    const input = $('.inline-comment-input', form);
+    const btn = $('.inline-comment-btn', form);
+
+    on(input, 'input', () => {
+      if (btn) btn.disabled = !input.value.trim();
+    });
+
+    on(form, 'submit', (event) => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      const stats = getPostStats(post);
+      stats.comments.push({ username: 'mike.photos', text });
+      stats.commentCount = Math.max(stats.commentCount + 1, stats.comments.length);
+      saveState();
+      updatePostCounts(post, stats);
+      input.value = '';
+      if (btn) btn.disabled = true;
+      sounds.pop();
+      announce('Comment posted.');
+    });
+  });
 }
 
 /* ==========================================================================
@@ -691,7 +1396,7 @@ class StoryViewer {
     this.currentIndex = 0;
     this.timer = null;
     this.progress = 0;
-    this.duration = 4500; // 4.5s per story
+    this.duration = 4500;
     this.isPaused = false;
     this.modal = null;
   }
@@ -706,7 +1411,6 @@ class StoryViewer {
     modal.id = 'storyModal';
     modal.className = 'story-modal';
     modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
     modal.innerHTML = `
       <div class="story-card">
         <div class="story-progress-container" id="storyProgress"></div>
@@ -754,23 +1458,20 @@ class StoryViewer {
     on($('#storyNavLeft', this.modal), 'click', () => this.prev());
     on($('#storyNavRight', this.modal), 'click', () => this.next());
 
-    // Pause on hold
     const card = $('.story-card', this.modal);
     on(card, 'mousedown', () => this.pause());
     on(card, 'mouseup', () => this.resume());
     on(card, 'touchstart', () => this.pause(), { passive: true });
     on(card, 'touchend', () => this.resume());
 
-    // Reaction emojis
     $$('.story-emoji-btn', this.modal).forEach((btn) => {
       on(btn, 'click', (e) => {
         const emoji = btn.dataset.emoji;
-        this.spawnFloatingEmoji(emoji, e.clientX, e.clientY);
+        this.spawnFloatingEmoji(emoji);
         sounds.reaction();
       });
     });
 
-    // Story reply
     on($('#storyReplyForm', this.modal), 'submit', (e) => {
       e.preventDefault();
       const input = $('.story-reply-input', this.modal);
@@ -781,25 +1482,13 @@ class StoryViewer {
       input.value = '';
       sounds.reaction();
     });
-
-    // Keyboard navigation
-    on(document, 'keydown', (e) => {
-      if (!this.modal?.classList.contains('active')) return;
-      if (e.key === 'ArrowRight' || e.key === ' ') {
-        e.preventDefault();
-        this.next();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        this.prev();
-      } else if (e.key === 'Escape') {
-        this.close();
-      }
-    });
   }
 
   open(startIndex = 0) {
     this.ensureModal();
-    this.currentIndex = Math.max(0, Math.min(startIndex, STORIES_DATA.length - 1));
+    const list = state.myStory ? [state.myStory, ...STORIES_DATA] : STORIES_DATA;
+    this.stories = list;
+    this.currentIndex = Math.max(0, Math.min(startIndex, list.length - 1));
     this.renderProgressBars();
     this.loadStory(this.currentIndex);
     this.modal.classList.add('active');
@@ -816,7 +1505,8 @@ class StoryViewer {
   renderProgressBars() {
     const container = $('#storyProgress', this.modal);
     if (!container) return;
-    container.innerHTML = STORIES_DATA.map((_, i) => `
+    const count = this.stories?.length || STORIES_DATA.length;
+    container.innerHTML = Array.from({ length: count }, (_, i) => `
       <div class="story-progress-bar">
         <div class="story-progress-fill" id="progress-${i}"></div>
       </div>
@@ -825,7 +1515,8 @@ class StoryViewer {
 
   loadStory(index) {
     clearInterval(this.timer);
-    const story = STORIES_DATA[index];
+    const list = this.stories || STORIES_DATA;
+    const story = list[index];
     if (!story) return this.close();
 
     $('#storyAvatar', this.modal).src = story.avatar;
@@ -834,17 +1525,10 @@ class StoryViewer {
     $('#storyImage', this.modal).src = story.image;
     $('#storyCaption', this.modal).textContent = story.caption;
 
-    // Update progress bars
-    STORIES_DATA.forEach((_, i) => {
+    list.forEach((_, i) => {
       const fill = $(`#progress-${i}`, this.modal);
       if (!fill) return;
-      if (i < index) {
-        fill.style.width = '100%';
-      } else if (i > index) {
-        fill.style.width = '0%';
-      } else {
-        fill.style.width = '0%';
-      }
+      fill.style.width = i < index ? '100%' : '0%';
     });
 
     this.progress = 0;
@@ -865,7 +1549,8 @@ class StoryViewer {
   }
 
   next() {
-    if (this.currentIndex < STORIES_DATA.length - 1) {
+    const list = this.stories || STORIES_DATA;
+    if (this.currentIndex < list.length - 1) {
       this.currentIndex += 1;
       this.loadStory(this.currentIndex);
     } else {
@@ -883,15 +1568,10 @@ class StoryViewer {
     }
   }
 
-  pause() {
-    this.isPaused = true;
-  }
+  pause() { this.isPaused = true; }
+  resume() { this.isPaused = false; }
 
-  resume() {
-    this.isPaused = false;
-  }
-
-  spawnFloatingEmoji(emoji, clientX, clientY) {
+  spawnFloatingEmoji(emoji) {
     const card = $('.story-card', this.modal);
     if (!card) return;
     for (let i = 0; i < 4; i++) {
@@ -911,7 +1591,7 @@ const storyViewer = new StoryViewer();
 
 function showStory(storyElement) {
   if (storyElement.classList.contains('story-add')) {
-    openUploadModal();
+    openStoryCreator();
     return;
   }
   const username = $('.story-item span:last-child', storyElement)?.textContent?.trim();
@@ -921,7 +1601,7 @@ function showStory(storyElement) {
 }
 
 /* ==========================================================================
-   Create Post & Photo Filters Flow
+   Create Post & Photo Filters Flow with Fine Adjustments
    ========================================================================== */
 const FILTER_PRESETS = [
   { id: 'filter-none', label: 'Normal', class: '' },
@@ -934,6 +1614,7 @@ const FILTER_PRESETS = [
 ];
 
 let currentSelectedFilter = '';
+let currentAspectRatio = 'aspect-4-5';
 
 function setupUpload() {
   const modal = $('#uploadModal');
@@ -980,7 +1661,6 @@ function setupUpload() {
   on(modal, 'click', (e) => { if (e.target === modal) closeModal(); });
   on(select, 'click', () => input.click());
 
-  // Filter selection chips setup
   setupFilterChips();
 
   const previewFile = (file) => {
@@ -999,7 +1679,7 @@ function setupUpload() {
       previewArea.style.display = 'grid';
       sounds.pop();
     };
-    reader.onerror = () => announce('Image could not be read. Try another.', 'error');
+    reader.onerror = () => announce('Image could not be read.', 'error');
     reader.readAsDataURL(file);
   };
 
@@ -1074,7 +1754,7 @@ function createNewPost({
 
   post.innerHTML = `
     <div class="post-header">
-      <div class="user-info">
+      <div class="user-info" data-creator="${escapeHtml(username)}">
         <img src="${escapeHtml(state.profile.avatar)}" alt="${escapeHtml(username)}" class="user-avatar">
         <div class="user-details">
           <span class="username">${escapeHtml(username)} <i class="fa-solid fa-circle-check verified" aria-label="Verified"></i></span>
@@ -1083,12 +1763,17 @@ function createNewPost({
       </div>
       <button class="post-options" aria-label="More options"><i class="fa-solid fa-ellipsis"></i></button>
     </div>
-    <div class="post-image">
-      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(caption || 'Moment shared on Mikesta')}" class="${escapeHtml(filter)}">
+    <div class="post-image" title="Double click to like">
+      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(caption || 'Moment on Mikesta')}" class="${escapeHtml(filter)}">
+      <div class="camera-badge" data-post-id="${id}">
+        <i class="fa-solid fa-camera"></i> <span>Leica M11 · 35mm</span>
+      </div>
     </div>
     <div class="post-actions">
       <div class="action-buttons">
-        <button class="action-btn like-btn" aria-label="Like post" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
+        <div class="like-btn-wrapper">
+          <button class="action-btn like-btn" aria-label="Like post" aria-pressed="false"><i class="fa-regular fa-heart"></i></button>
+        </div>
         <button class="action-btn" aria-label="Comment"><i class="fa-regular fa-comment"></i></button>
         <button class="action-btn" aria-label="Share"><i class="fa-regular fa-paper-plane"></i></button>
       </div>
@@ -1096,7 +1781,7 @@ function createNewPost({
     </div>
     <div class="post-info">
       <div class="likes-count"><strong>0 likes</strong></div>
-      <div class="post-caption"><strong>${escapeHtml(username)}</strong> ${escapeHtml(caption || 'A small moment worth keeping.')}</div>
+      <div class="post-caption"><strong data-creator="${escapeHtml(username)}">${escapeHtml(username)}</strong> ${escapeHtml(caption || 'A small moment worth keeping.')}</div>
       <button class="view-comments">View all 0 comments</button>
       <div class="post-recent-comments"></div>
       <div class="post-time">${persist ? 'JUST NOW' : 'SHARED EARLIER'}</div>
@@ -1109,6 +1794,7 @@ function createNewPost({
 
   feed.prepend(post);
   setupHeartBurst(post);
+  setupReactionDocks();
 
   state.postStats[id] = state.postStats[id] || { likes: 0, comments: [], commentCount: 0 };
   updatePostCounts(post, state.postStats[id]);
@@ -1139,7 +1825,7 @@ function handleFollow(button) {
 }
 
 /* ==========================================================================
-   Interactive Live Search Dropdown
+   Live Autocomplete Search
    ========================================================================== */
 const SEARCH_DATABASE = [
   { type: 'user', title: 'mike.photos', subtitle: 'Mike Anderson · Creator', avatar: 'https://i.pravatar.cc/150?img=10' },
@@ -1244,8 +1930,41 @@ function filterFeedByQuery(query) {
   announce(matched ? `Found ${matched} moment${matched === 1 ? '' : 's'} matching “${query}”.` : `No moments found for “${query}”.`, matched ? 'default' : 'error');
 }
 
+function setupTagFilter() {
+  const tags = $$('.tag-pill');
+  tags.forEach((tag) => {
+    on(tag, 'click', () => {
+      tags.forEach((t) => t.classList.remove('active'));
+      tag.classList.add('active');
+      const selected = tag.dataset.tag || 'all';
+      state.activeTag = selected;
+      filterFeedByTag(selected);
+      sounds.pop();
+    });
+  });
+}
+
+function filterFeedByTag(tag) {
+  const posts = $$('.feed-section .post-card');
+  let matched = 0;
+  posts.forEach((post) => {
+    const postTags = (post.dataset.tags || '').toLowerCase();
+    const text = post.textContent.toLowerCase();
+    if (tag === 'all' || postTags.includes(tag) || text.includes(tag)) {
+      post.style.display = 'block';
+      post.style.animation = 'fadeIn 0.3s ease';
+      matched += 1;
+    } else {
+      post.style.display = 'none';
+    }
+  });
+  if (tag !== 'all') {
+    announce(`Showing ${matched} moment${matched === 1 ? '' : 's'} for #${tag}.`);
+  }
+}
+
 /* ==========================================================================
-   Notifications Center
+   Notifications
    ========================================================================== */
 const NOTIFICATIONS_DATA = [
   { user: 'ava.studio', avatar: 'https://i.pravatar.cc/100?img=1', action: 'liked your photo from Rockaway Beach.', time: '12m ago', type: 'likes' },
@@ -1298,7 +2017,7 @@ function showNotifications() {
 }
 
 /* ==========================================================================
-   Post Lightbox Modal (Full Photo & Comments Inspector)
+   Post Lightbox Modal
    ========================================================================== */
 function openLightbox(postData) {
   let modal = $('#lightboxModal');
@@ -1425,7 +2144,6 @@ function setupProfilePage() {
     });
   }
 
-  // Profile tabs: Posts vs Saved
   $$('.profile-tabs button').forEach((tab, index) => {
     on(tab, 'click', () => {
       $$('.profile-tabs button').forEach((item) => item.classList.remove('active'));
@@ -1458,10 +2176,11 @@ function applyProfile() {
 function hydrateProfilePosts() {
   const grid = $('.profile-grid');
   if (!grid) return;
-  grid.classList.remove('saved-view');
+  const colTabs = $('.collection-tabs');
+  if (colTabs) colTabs.remove();
+
   $$('.user-post-tile, .profile-grid-item', grid).forEach((el) => el.remove());
 
-  // User created posts
   [...state.posts].forEach((post) => {
     const item = document.createElement('div');
     item.className = 'profile-grid-item user-post-tile';
@@ -1486,19 +2205,40 @@ function renderSavedProfileGrid() {
   if (!grid) return;
   grid.innerHTML = '';
 
+  // Insert collections filter pills
+  let colTabs = $('.collection-tabs');
+  if (!colTabs) {
+    colTabs = document.createElement('div');
+    colTabs.className = 'collection-tabs';
+    colTabs.innerHTML = `
+      <button class="collection-pill active" data-col="all">All Saved</button>
+      <button class="collection-pill" data-col="arch">Architecture</button>
+      <button class="collection-pill" data-col="atmo">Atmosphere</button>
+      <button class="collection-pill" data-col="travel">Travel</button>
+    `;
+    grid.parentElement.insertBefore(colTabs, grid);
+
+    $$('.collection-pill', colTabs).forEach((pill) => {
+      on(pill, 'click', () => {
+        $$('.collection-pill', colTabs).forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        sounds.pop();
+      });
+    });
+  }
+
   const savedIds = state.savedPosts;
   if (!savedIds.length) {
     grid.innerHTML = `
       <div class="empty-saved-state">
         <i class="fa-regular fa-bookmark"></i>
         <h3>No saved moments yet</h3>
-        <p>Tap the bookmark icon on any photo in your circle to save it to your private library.</p>
+        <p>Tap the bookmark icon on any photo in your circle to save it to your private collection.</p>
       </div>
     `;
     return;
   }
 
-  // Pre-seed library images for saved items
   const seedSaved = {
     'post-1': { src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', user: 'mike.photos', likes: 1235 },
     'post-2': { src: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=800&q=80', user: 'travel.adventures', likes: 856 },
@@ -1544,33 +2284,27 @@ function setupProfileGridLightbox() {
 }
 
 /* ==========================================================================
-   State Restoration & Initialization
+   State Restoration & Global Event Listeners
    ========================================================================== */
 function restoreState() {
   applyTheme(state.theme);
 
-  // Sound toggle button in nav
   const soundBtn = $('#soundBtn');
   if (soundBtn) {
     soundBtn.classList.toggle('muted', !state.soundEnabled);
     soundBtn.innerHTML = state.soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
-    on(soundBtn, 'click', () => {
-      state.soundEnabled = !state.soundEnabled;
-      saveState();
-      soundBtn.classList.toggle('muted', !state.soundEnabled);
-      soundBtn.innerHTML = state.soundEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
-      if (state.soundEnabled) sounds.pop();
-      announce(state.soundEnabled ? 'Audio vibes on.' : 'Audio vibes muted.');
-    });
+    on(soundBtn, 'click', toggleSound);
   }
 
-  // Vibe picker button
   const vibeBtn = $('#vibeBtn');
-  if (vibeBtn) {
-    on(vibeBtn, 'click', showThemeMenu);
-  }
+  if (vibeBtn) on(vibeBtn, 'click', showThemeMenu);
 
-  // Restore post likes & saves
+  const kbdBtn = $('#kbdBtn');
+  if (kbdBtn) on(kbdBtn, 'click', toggleCommandPalette);
+
+  const chatBtn = $('#chatBtn');
+  if (chatBtn) on(chatBtn, 'click', openChat);
+
   $$('.post-card').forEach((post) => {
     const id = getPostId(post);
     const stats = getPostStats(post);
@@ -1591,7 +2325,8 @@ function restoreState() {
     }
   });
 
-  // Restore followed users
+  setupReactionDocks();
+
   $$('.follow-btn').forEach((button) => {
     const username = $('.suggestion-username', button.closest('.suggestion-item'))?.textContent;
     if (state.followedUsers.includes(username)) {
@@ -1600,7 +2335,6 @@ function restoreState() {
     }
   });
 
-  // Notification badge
   const badge = $('#notifBadge');
   if (badge && state.unreadNotifications > 0) {
     badge.classList.add('active');
@@ -1621,23 +2355,43 @@ function setupEvents() {
   const filter = $('.feed-filter');
   if (filter) {
     filter.innerHTML = `${state.feed} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>`;
-    on(filter, 'click', (event) => showFeedMenu(event.currentTarget));
+    on(filter, 'click', (event) => {
+      const menu = document.createElement('div');
+      menu.className = 'choice-list';
+      ['Following', 'For you', 'Recent'].forEach((option) => {
+        const item = makeButton(`${option}${state.feed === option ? '  ✓' : ''}`, 'choice-item', { type: 'button' });
+        on(item, 'click', () => {
+          state.feed = option;
+          saveState();
+          filter.innerHTML = `${option} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>`;
+          closeDialog();
+          announce(`Feed set to ${option}.`);
+        });
+        menu.appendChild(item);
+      });
+      openDialog('Choose your feed', menu, 'View');
+    });
   }
 
-  on($('.stories-heading button'), 'click', () => {
-    storyViewer.open(0);
-  });
-
+  on($('.stories-heading button'), 'click', () => storyViewer.open(0));
   on($('.see-all'), 'click', () => announce('Viewing all recommended creators.'));
-  on($('.nav-icons button[title="Notifications"]'), 'click', showNotifications);
+  on($('#notifBtn'), 'click', showNotifications);
   on($('#mobileNotifBtn'), 'click', showNotifications);
 
   // Global delegation
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, .story-item');
+    const target = event.target.closest('button, .story-item, .camera-badge, [data-creator]');
     if (!target) return;
     const post = target.closest('.post-card');
 
+    if (target.matches('.camera-badge')) {
+      const id = target.dataset.postId || getPostId(post);
+      return showExifDetails(id);
+    }
+    if (target.matches('[data-creator]')) {
+      const user = target.dataset.creator;
+      return showCreatorProfile(user);
+    }
     if (target.matches('.like-btn')) return handleLike(target);
     if (target.matches('.save-btn')) return handleSave(target);
     if (target.matches('.view-comments, .action-btn[aria-label="Comment"]')) return showComments(post);
@@ -1648,11 +2402,58 @@ function setupEvents() {
   });
 }
 
+// Global Keyboard Navigation (Linear-style speed)
 on(document, 'keydown', (event) => {
+  const activeTag = document.activeElement?.tagName;
+  const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
+
+  // Esc closes any open surface
   if (event.key === 'Escape') {
     closeDialog();
+    closeChat();
+    storyViewer.close();
+    $('#lightboxModal')?.classList.remove('active');
+    $('#commandPaletteBackdrop')?.classList.remove('active');
+    $('#creatorModal')?.classList.remove('active');
+    return;
+  }
+
+  // Cmd+K or Ctrl+K opens Command Palette
+  if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+    event.preventDefault();
+    toggleCommandPalette();
+    return;
+  }
+
+  if (isInput) return;
+
+  // Single-key shortcuts
+  if (event.key === '?') {
+    event.preventDefault();
+    toggleCommandPalette();
+  } else if (event.key === 't' || event.key === 'T') {
+    cycleTheme();
+  } else if (event.key === 'm' || event.key === 'M') {
+    toggleSound();
+  } else if (event.key === 'd' || event.key === 'D') {
+    openChat();
+  } else if (event.key === 'n' || event.key === 'N') {
+    window.openUploadModal?.();
+  } else if (event.key === '/') {
+    event.preventDefault();
+    $('.search-bar input')?.focus();
+  } else if (event.key === 'j' || event.key === 'J') {
+    // Jump to next post
+    const posts = $$('.post-card');
+    const current = posts.find((p) => p.getBoundingClientRect().top > 50);
+    current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (event.key === 'k' || event.key === 'K') {
+    // Jump to previous post
+    const posts = [...$$('.post-card')].reverse();
+    const current = posts.find((p) => p.getBoundingClientRect().top < -50);
+    current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 
-// Start app
+// Initialize on page ready
 setupEvents();
