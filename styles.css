@@ -141,6 +141,16 @@ img {
   overflow: hidden;
 }
 
+/* Optional subtle film grain texture */
+.film-grain-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
 /* ==========================================================================
    Navbar
    ========================================================================== */
@@ -163,7 +173,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
 }
 
 .logo {
@@ -200,7 +210,7 @@ img {
 
 .search-wrapper {
   position: relative;
-  flex: 0 1 300px;
+  flex: 0 1 270px;
 }
 
 .search-bar {
@@ -208,7 +218,7 @@ img {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 9px 14px;
+  padding: 8px 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--paper);
@@ -320,7 +330,7 @@ img {
 .nav-icons {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .nav-btn {
@@ -329,7 +339,7 @@ img {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  font-size: 18px;
+  font-size: 17px;
   color: var(--ink);
   position: relative;
   transition: transform var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
@@ -356,12 +366,69 @@ img {
   transform: translateY(-2px) scale(1.04);
 }
 
+/* Ambient Audio Radio Pill */
+.ambient-radio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  transition: all var(--transition-fast);
+}
+
+.ambient-radio-btn:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.ambient-radio-btn.playing {
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.15);
+}
+
+.eq-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  width: 10px;
+}
+
+.eq-bar {
+  flex: 1;
+  background: var(--accent);
+  border-radius: 1px;
+  height: 4px;
+  transition: height 0.2s ease;
+}
+
+.ambient-radio-btn.playing .eq-bar:nth-child(1) {
+  animation: eqJump 0.6s infinite alternate ease-in-out;
+}
+.ambient-radio-btn.playing .eq-bar:nth-child(2) {
+  animation: eqJump 0.8s infinite 0.2s alternate ease-in-out;
+}
+.ambient-radio-btn.playing .eq-bar:nth-child(3) {
+  animation: eqJump 0.5s infinite 0.4s alternate ease-in-out;
+}
+
+@keyframes eqJump {
+  0% { height: 3px; }
+  100% { height: 12px; }
+}
+
 /* Command Palette Keyboard Trigger */
 .kbd-nav-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 9px;
+  padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--paper);
@@ -473,7 +540,7 @@ img {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .welcome-row h1 {
@@ -509,6 +576,54 @@ img {
 .feed-filter:hover {
   border-color: var(--accent);
   color: var(--ink);
+}
+
+/* Editorial "Moment of the Day" Spotlight */
+.moment-of-the-day-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.06), rgba(241, 216, 121, 0.08));
+  position: relative;
+  overflow: hidden;
+}
+
+.curator-pick-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--yellow);
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.moment-spotlight-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--ink);
+  margin: 0;
+}
+
+.moment-spotlight-text em {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+}
+
+.moment-spotlight-view-btn {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  flex-shrink: 0;
 }
 
 /* Explore Tags Rail */
@@ -664,7 +779,7 @@ img {
 }
 
 /* ==========================================================================
-   Feed & Post Cards
+   Feed & Multi-Image Carousel Cards
    ========================================================================== */
 .feed-section {
   display: flex;
@@ -680,6 +795,7 @@ img {
   background: var(--surface);
   box-shadow: var(--shadow);
   transition: border-color var(--transition-smooth), box-shadow var(--transition-smooth), transform var(--transition-smooth);
+  will-change: transform;
 }
 
 .post-card.highlight {
@@ -730,6 +846,11 @@ img {
 .location {
   color: var(--muted);
   font-size: 11px;
+  cursor: pointer;
+}
+
+.location:hover {
+  color: var(--accent);
 }
 
 .post-options {
@@ -748,7 +869,112 @@ img {
   color: var(--ink);
 }
 
-/* Post Image Container & Aspect Ratios */
+/* Multi-Image Carousel */
+.carousel-container {
+  position: relative;
+  aspect-ratio: 1.25;
+  overflow: hidden;
+  background: #e5e8e4;
+  user-select: none;
+}
+
+.carousel-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.carousel-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.carousel-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(15, 25, 22, 0.65);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  transition: all var(--transition-fast);
+  opacity: 0;
+}
+
+.carousel-container:hover .carousel-arrow {
+  opacity: 1;
+}
+
+.carousel-arrow.prev {
+  left: 12px;
+}
+
+.carousel-arrow.next {
+  right: 12px;
+}
+
+.carousel-arrow:hover {
+  background: rgba(15, 25, 22, 0.9);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-counter {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 15;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(15, 22, 20, 0.65);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.carousel-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  gap: 5px;
+}
+
+.carousel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+.carousel-dot.active {
+  width: 16px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+/* Post Image Container */
 .post-image {
   position: relative;
   aspect-ratio: 1.25;
@@ -756,18 +982,6 @@ img {
   background: #e5e8e4;
   cursor: pointer;
   user-select: none;
-}
-
-.post-image.aspect-1-1 {
-  aspect-ratio: 1;
-}
-
-.post-image.aspect-4-5 {
-  aspect-ratio: 4 / 5;
-}
-
-.post-image.aspect-16-9 {
-  aspect-ratio: 16 / 9;
 }
 
 .post-image img {
@@ -1263,7 +1477,7 @@ img {
 }
 
 /* ==========================================================================
-   Create Post Modal & Advanced Adjustments
+   Create Post Modal & Pro Darkroom Adjustments
    ========================================================================== */
 .modal {
   display: none;
@@ -1439,29 +1653,6 @@ img {
   object-fit: cover;
 }
 
-/* Aspect ratio selector in editor */
-.aspect-ratio-selector {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.aspect-btn {
-  padding: 4px 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-size: 10px;
-  font-family: 'DM Mono', monospace;
-  color: var(--muted);
-}
-
-.aspect-btn.active {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-}
-
-/* Filter selector */
 .filter-selector-title {
   font-family: 'DM Mono', monospace;
   font-size: 10px;
@@ -1505,43 +1696,6 @@ img {
   background: var(--accent);
   color: #ffffff;
   border-color: var(--accent);
-}
-
-/* Adjustment Sliders Group */
-.adjustments-toggle {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.adjustments-panel {
-  display: none;
-  grid-gap: 8px;
-  padding: 10px;
-  background: var(--paper);
-  border-radius: var(--radius-sm);
-}
-
-.adjustments-panel.open {
-  display: grid;
-}
-
-.adjustment-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.adjustment-row input[type="range"] {
-  flex: 1;
-  accent-color: var(--accent);
 }
 
 .post-details textarea, .post-details input {
@@ -1616,15 +1770,6 @@ img {
   color: #ffffff;
   overflow: hidden;
   transition: background 0.3s ease;
-}
-
-.story-creator-preview img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: none;
 }
 
 .story-creator-text {
@@ -2060,7 +2205,6 @@ img {
   text-overflow: ellipsis;
 }
 
-/* Chat Conversation View inside Drawer */
 .chat-conversation-view {
   display: none;
   flex-direction: column;
@@ -2341,7 +2485,7 @@ img {
 }
 
 /* ==========================================================================
-   Post Lightbox Modal (Full Photo & Comments Inspector)
+   Post Lightbox Modal
    ========================================================================== */
 .lightbox-modal {
   position: fixed;
@@ -2432,7 +2576,7 @@ img {
 }
 
 /* ==========================================================================
-   Profile Page & Collections
+   Profile Page, Collections & Stacks
    ========================================================================== */
 .profile-page {
   width: min(100%, 1050px);
@@ -2557,7 +2701,6 @@ img {
   margin-right: 6px;
 }
 
-/* Saved Collections Filter Chips */
 .collection-tabs {
   display: flex;
   justify-content: center;
@@ -3102,7 +3245,7 @@ img {
   .search-wrapper {
     display: none;
   }
-  .nav-icons .nav-btn-primary, .nav-icons .sound-btn, .nav-icons .kbd-nav-btn {
+  .nav-icons .nav-btn-primary, .nav-icons .sound-btn, .nav-icons .kbd-nav-btn, .ambient-radio-btn {
     display: none;
   }
   .mobile-nav-bar {

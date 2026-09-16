@@ -1,8 +1,16 @@
 /**
  * Mikesta — Professional-Grade Client Application Engine
- * Architecture: State persistence, multi-vibe themes, immersive stories viewer,
- * story creator studio, camera EXIF inspector, direct messages (DM) with simulated chat,
- * command palette (Cmd+K), post reaction dock, fine-tuning adjustments, and keyboard navigation.
+ * Advanced Systems:
+ * - State persistence with offline PWA service worker
+ * - Multi-image swipe/touch photo carousels
+ * - Procedural Ambient Soundscape ("Circle Radio") with Web Audio oscillators & vinyl tape crackle
+ * - Multi-vibe themes & Command Palette (Cmd+K / ?)
+ * - Immersive stories viewer & dedicated Story Studio creator
+ * - Camera EXIF inspector & Creator profile sheets
+ * - Direct Messages (DM) with simulated contextual replies
+ * - Floating emoji reaction docks & double-tap heart bursts
+ * - Interactive World Moments map & Stacks moodboards
+ * - Subtle 3D gyro/mouse parallax card tilt
  */
 
 // Core DOM helpers
@@ -13,7 +21,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => 
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 }[char]));
 
-const STORAGE_KEY = 'mikesta-state-v4';
+const STORAGE_KEY = 'mikesta-state-v5';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 // Default initial state
@@ -62,12 +70,12 @@ const defaultState = {
   },
   feed: 'Following',
   activeTag: 'all',
-  activeSavedCategory: 'all',
   theme: 'paper',
   soundEnabled: true,
+  ambientRadioPlaying: false,
   unreadNotifications: 3,
   unreadMessages: 1,
-  myStory: null, // Custom user story
+  myStory: null,
   chatMessages: {
     'ava.studio': [
       { sender: 'them', text: 'That Rockaway photo is unreal! What lens did you shoot it on?', time: '10:42 AM' },
@@ -116,13 +124,14 @@ const saveState = () => {
 };
 
 /* ==========================================================================
-   Tactile Web Audio Synthesizer
-   Zero dependencies; gentle pitch sweeps, shutter clicks, and message chimes.
+   Tactile Web Audio Synthesizer & Procedural Ambient Soundscape
    ========================================================================== */
-class SoundEngine {
+class AudioEngine {
   constructor() {
     this.ctx = null;
+    this.ambientNodes = null;
   }
+
   init() {
     if (!this.ctx && typeof window !== 'undefined') {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -132,6 +141,7 @@ class SoundEngine {
       this.ctx.resume();
     }
   }
+
   pop() {
     if (!state.soundEnabled) return;
     this.init();
@@ -151,6 +161,7 @@ class SoundEngine {
       osc.stop(now + 0.09);
     } catch {}
   }
+
   reaction() {
     if (!state.soundEnabled) return;
     this.init();
@@ -170,6 +181,7 @@ class SoundEngine {
       osc.stop(now + 0.13);
     } catch {}
   }
+
   shutter() {
     if (!state.soundEnabled) return;
     this.init();
@@ -189,6 +201,7 @@ class SoundEngine {
       osc.stop(now + 0.09);
     } catch {}
   }
+
   chime() {
     if (!state.soundEnabled) return;
     this.init();
@@ -209,9 +222,71 @@ class SoundEngine {
       });
     } catch {}
   }
+
+  // Procedural warm lofi vinyl drone soundscape
+  toggleAmbientRadio() {
+    this.init();
+    if (!this.ctx) return;
+
+    if (this.ambientNodes) {
+      // Stop ambient sound
+      try {
+        this.ambientNodes.masterGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.5);
+        setTimeout(() => {
+          this.ambientNodes.oscillators.forEach((o) => { try { o.stop(); } catch {} });
+          this.ambientNodes = null;
+        }, 500);
+      } catch {}
+      state.ambientRadioPlaying = false;
+      saveState();
+      updateAmbientRadioUI(false);
+      announce('Circle Radio paused.');
+    } else {
+      // Start ambient chord drone + subtle tape texture
+      try {
+        const masterGain = this.ctx.createGain();
+        masterGain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+        masterGain.gain.exponentialRampToValueAtTime(0.08, this.ctx.currentTime + 1.2);
+        masterGain.connect(this.ctx.destination);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(320, this.ctx.currentTime);
+        filter.connect(masterGain);
+
+        // F# Major 7th ambient chord (F#2, C#3, F3, A#3)
+        const chordFrequencies = [92.5, 138.59, 174.61, 233.08];
+        const oscillators = chordFrequencies.map((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          osc.detune.setValueAtTime((Math.random() * 8) - 4, this.ctx.currentTime);
+          osc.connect(filter);
+          osc.start();
+          return osc;
+        });
+
+        this.ambientNodes = { masterGain, filter, oscillators };
+        state.ambientRadioPlaying = true;
+        saveState();
+        updateAmbientRadioUI(true);
+        announce('Now Playing: Ambient Circle Radio ✨', 'success');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
 }
 
-const sounds = new SoundEngine();
+const sounds = new AudioEngine();
+
+function updateAmbientRadioUI(isPlaying) {
+  const btn = $('#ambientRadioBtn');
+  if (!btn) return;
+  btn.classList.toggle('playing', isPlaying);
+  const text = $('.ambient-radio-label', btn);
+  if (text) text.textContent = isPlaying ? 'Circle Radio · Live' : 'Circle Radio';
+}
 
 /* ==========================================================================
    Toast Notifications
@@ -346,6 +421,95 @@ function makeButton(text, className = 'dialog-action', attributes = {}) {
   button.textContent = text;
   Object.entries(attributes).forEach(([key, value]) => button.setAttribute(key, value));
   return button;
+}
+
+/* ==========================================================================
+   Multi-Image Carousel Engine
+   ========================================================================== */
+function setupCarousels() {
+  $$('.carousel-container').forEach((container) => {
+    if (container.dataset.carouselInit) return;
+    container.dataset.carouselInit = 'true';
+
+    const track = $('.carousel-track', container);
+    const slides = $$('.carousel-slide', container);
+    const dots = $$('.carousel-dot', container);
+    const counter = $('.carousel-counter', container);
+    const prevBtn = $('.carousel-arrow.prev', container);
+    const nextBtn = $('.carousel-arrow.next', container);
+    let currentIndex = 0;
+
+    const updateSlide = (newIndex) => {
+      currentIndex = Math.max(0, Math.min(newIndex, slides.length - 1));
+      track.style.transform = `translateX(-${currentIndex * 100}%)`;
+      dots.forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
+      if (counter) counter.textContent = `${currentIndex + 1}/${slides.length}`;
+      if (prevBtn) prevBtn.style.display = currentIndex === 0 ? 'none' : 'grid';
+      if (nextBtn) nextBtn.style.display = currentIndex === slides.length - 1 ? 'none' : 'grid';
+    };
+
+    on(prevBtn, 'click', (e) => {
+      e.stopPropagation();
+      updateSlide(currentIndex - 1);
+      sounds.pop();
+    });
+
+    on(nextBtn, 'click', (e) => {
+      e.stopPropagation();
+      updateSlide(currentIndex + 1);
+      sounds.pop();
+    });
+
+    dots.forEach((dot, i) => {
+      on(dot, 'click', (e) => {
+        e.stopPropagation();
+        updateSlide(i);
+        sounds.pop();
+      });
+    });
+
+    // Touch swipe gestures
+    let touchStartX = 0;
+    on(container, 'touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    on(container, 'touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
+      if (diff > 45) updateSlide(currentIndex + 1);
+      if (diff < -45) updateSlide(currentIndex - 1);
+    });
+
+    updateSlide(0);
+  });
+}
+
+/* ==========================================================================
+   3D Card Parallax Tilt (Subtle tactile physics)
+   ========================================================================== */
+function setupCardTilt() {
+  if (window.matchMedia('(hover: hover)').matches) {
+    $$('.post-card').forEach((card) => {
+      if (card.dataset.tiltBound) return;
+      card.dataset.tiltBound = 'true';
+
+      on(card, 'mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const rotateX = ((y - centerY) / centerY) * -1.8;
+        const rotateY = ((x - centerX) / centerX) * 1.8;
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+      });
+
+      on(card, 'mouseleave', () => {
+        card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
+      });
+    });
+  }
 }
 
 /* ==========================================================================
@@ -596,7 +760,7 @@ function showCreatorProfile(username) {
     }
     saveState();
     sounds.pop();
-    // Update any matching follow buttons in sidebar
+
     $$('.suggestion-item').forEach((item) => {
       if ($('.suggestion-username', item)?.textContent === username) {
         const btn = $('.follow-btn', item);
@@ -687,7 +851,6 @@ function ensureChatDrawer() {
     const text = input.value.trim();
     if (!text || !activeChatUser) return;
 
-    // Append outgoing message
     state.chatMessages[activeChatUser] = state.chatMessages[activeChatUser] || [];
     state.chatMessages[activeChatUser].push({ sender: 'me', text, time: 'Just now' });
     saveState();
@@ -695,7 +858,6 @@ function ensureChatDrawer() {
     input.value = '';
     sounds.pop();
 
-    // Contextual auto-reply simulation
     setTimeout(() => {
       const replies = {
         'ava.studio': [
@@ -831,7 +993,6 @@ const STORY_STICKERS = [
 
 let currentStoryGradient = STORY_GRADIENTS[0];
 let currentStorySticker = STORY_STICKERS[0];
-let currentStoryImage = null;
 
 function openStoryCreator() {
   let modal = $('#storyCreatorModal');
@@ -843,7 +1004,6 @@ function openStoryCreator() {
     modal.innerHTML = `
       <div class="story-creator-card">
         <div class="story-creator-preview" id="storyPreviewBox">
-          <img id="storyPreviewImg" src="" alt="">
           <span class="story-creator-text" id="storyPreviewText">Sharing a quiet moment...</span>
           <span class="story-creator-sticker" id="storyPreviewSticker">${STORY_STICKERS[0]}</span>
         </div>
@@ -876,7 +1036,6 @@ function openStoryCreator() {
       $('#storyPreviewText', modal).textContent = val;
     });
 
-    // Populate gradients
     const gradList = $('#storyGradientList', modal);
     gradList.innerHTML = STORY_GRADIENTS.map((g, i) => `
       <button type="button" class="gradient-dot ${i === 0 ? 'active' : ''}" style="background: ${g};" data-grad="${g}"></button>
@@ -891,7 +1050,6 @@ function openStoryCreator() {
       });
     });
 
-    // Populate stickers
     const stickList = $('#storyStickerList', modal);
     stickList.innerHTML = STORY_STICKERS.map((s, i) => `
       <button type="button" class="sticker-chip ${i === 0 ? 'active' : ''}" data-sticker="${escapeHtml(s)}">${escapeHtml(s)}</button>
@@ -908,7 +1066,6 @@ function openStoryCreator() {
 
     on($('#publishStoryBtn', modal), 'click', () => {
       const captionText = $('#storyTextInput', modal).value.trim() || 'A small moment worth keeping.';
-      // Add as custom story in STORIES_DATA
       state.myStory = {
         id: 'story-mike',
         username: 'mike.photos',
@@ -920,7 +1077,6 @@ function openStoryCreator() {
       };
       saveState();
 
-      // Update "Your story" avatar in the rail
       const myStoryItem = $('.story-item.story-add');
       if (myStoryItem) {
         myStoryItem.classList.remove('story-add');
@@ -946,6 +1102,7 @@ function openStoryCreator() {
 const COMMANDS = [
   { key: 'N', label: 'Create new post', action: () => window.openUploadModal?.() },
   { key: 'D', label: 'Open Direct Messages', action: () => openChat() },
+  { key: 'R', label: 'Toggle Circle Radio', action: () => sounds.toggleAmbientRadio() },
   { key: 'T', label: 'Cycle aesthetic vibe (theme)', action: () => cycleTheme() },
   { key: 'M', label: 'Toggle sound effects', action: () => toggleSound() },
   { key: 'P', label: 'Go to your profile', action: () => window.location.href = 'profile.html' },
@@ -1037,7 +1194,6 @@ function setupReactionDocks() {
     if (!likeBtn || likeBtn.dataset.dockBound) return;
     likeBtn.dataset.dockBound = 'true';
 
-    // Create floating reaction dock
     const dock = document.createElement('div');
     dock.className = 'reaction-dock';
     dock.innerHTML = `
@@ -1279,11 +1435,11 @@ function updatePostCounts(post, stats) {
 }
 
 function setupHeartBurst(post) {
-  const imageBox = $('.post-image', post);
+  const imageBox = $('.post-image, .carousel-container', post);
   if (!imageBox) return;
 
   let lastTap = 0;
-  on(imageBox, 'click', (event) => {
+  on(imageBox, 'click', () => {
     const now = Date.now();
     const delta = now - lastTap;
     if (delta < 300 && delta > 0) {
@@ -1300,7 +1456,7 @@ function setupHeartBurst(post) {
 }
 
 function triggerHeartBurst(post) {
-  const imageBox = $('.post-image', post);
+  const imageBox = $('.post-image, .carousel-container', post);
   if (!imageBox) return;
   const burst = document.createElement('div');
   burst.className = 'heart-burst';
@@ -1601,7 +1757,7 @@ function showStory(storyElement) {
 }
 
 /* ==========================================================================
-   Create Post & Photo Filters Flow with Fine Adjustments
+   Create Post & Photo Filters Flow
    ========================================================================== */
 const FILTER_PRESETS = [
   { id: 'filter-none', label: 'Normal', class: '' },
@@ -1614,7 +1770,6 @@ const FILTER_PRESETS = [
 ];
 
 let currentSelectedFilter = '';
-let currentAspectRatio = 'aspect-4-5';
 
 function setupUpload() {
   const modal = $('#uploadModal');
@@ -1795,6 +1950,7 @@ function createNewPost({
   feed.prepend(post);
   setupHeartBurst(post);
   setupReactionDocks();
+  setupCardTilt();
 
   state.postStats[id] = state.postStats[id] || { likes: 0, comments: [], commentCount: 0 };
   updatePostCounts(post, state.postStats[id]);
@@ -2205,7 +2361,6 @@ function renderSavedProfileGrid() {
   if (!grid) return;
   grid.innerHTML = '';
 
-  // Insert collections filter pills
   let colTabs = $('.collection-tabs');
   if (!colTabs) {
     colTabs = document.createElement('div');
@@ -2296,6 +2451,11 @@ function restoreState() {
     on(soundBtn, 'click', toggleSound);
   }
 
+  const radioBtn = $('#ambientRadioBtn');
+  if (radioBtn) {
+    on(radioBtn, 'click', () => sounds.toggleAmbientRadio());
+  }
+
   const vibeBtn = $('#vibeBtn');
   if (vibeBtn) on(vibeBtn, 'click', showThemeMenu);
 
@@ -2304,6 +2464,18 @@ function restoreState() {
 
   const chatBtn = $('#chatBtn');
   if (chatBtn) on(chatBtn, 'click', openChat);
+
+  const spotlightBtn = $('#spotlightViewBtn');
+  if (spotlightBtn) {
+    on(spotlightBtn, 'click', () => {
+      openLightbox({
+        image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=85',
+        username: 'mike.photos',
+        location: 'Rockaway Beach, NY',
+        caption: '“A little more blue before the day gets loud.” Shot on Leica M11 with Summilux 35mm f/1.4.'
+      });
+    });
+  }
 
   $$('.post-card').forEach((post) => {
     const id = getPostId(post);
@@ -2326,6 +2498,8 @@ function restoreState() {
   });
 
   setupReactionDocks();
+  setupCarousels();
+  setupCardTilt();
 
   $$('.follow-btn').forEach((button) => {
     const username = $('.suggestion-username', button.closest('.suggestion-item'))?.textContent;
@@ -2378,7 +2552,6 @@ function setupEvents() {
   on($('#notifBtn'), 'click', showNotifications);
   on($('#mobileNotifBtn'), 'click', showNotifications);
 
-  // Global delegation
   document.addEventListener('click', (event) => {
     const target = event.target.closest('button, .story-item, .camera-badge, [data-creator]');
     if (!target) return;
@@ -2402,12 +2575,11 @@ function setupEvents() {
   });
 }
 
-// Global Keyboard Navigation (Linear-style speed)
+// Global Keyboard Navigation
 on(document, 'keydown', (event) => {
   const activeTag = document.activeElement?.tagName;
   const isInput = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
 
-  // Esc closes any open surface
   if (event.key === 'Escape') {
     closeDialog();
     closeChat();
@@ -2418,7 +2590,6 @@ on(document, 'keydown', (event) => {
     return;
   }
 
-  // Cmd+K or Ctrl+K opens Command Palette
   if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
     event.preventDefault();
     toggleCommandPalette();
@@ -2427,7 +2598,6 @@ on(document, 'keydown', (event) => {
 
   if (isInput) return;
 
-  // Single-key shortcuts
   if (event.key === '?') {
     event.preventDefault();
     toggleCommandPalette();
@@ -2435,6 +2605,8 @@ on(document, 'keydown', (event) => {
     cycleTheme();
   } else if (event.key === 'm' || event.key === 'M') {
     toggleSound();
+  } else if (event.key === 'r' || event.key === 'R') {
+    sounds.toggleAmbientRadio();
   } else if (event.key === 'd' || event.key === 'D') {
     openChat();
   } else if (event.key === 'n' || event.key === 'N') {
@@ -2443,17 +2615,22 @@ on(document, 'keydown', (event) => {
     event.preventDefault();
     $('.search-bar input')?.focus();
   } else if (event.key === 'j' || event.key === 'J') {
-    // Jump to next post
     const posts = $$('.post-card');
     const current = posts.find((p) => p.getBoundingClientRect().top > 50);
     current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } else if (event.key === 'k' || event.key === 'K') {
-    // Jump to previous post
     const posts = [...$$('.post-card')].reverse();
     const current = posts.find((p) => p.getBoundingClientRect().top < -50);
     current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 
-// Initialize on page ready
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// Start application
 setupEvents();

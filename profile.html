@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#182523">
   <meta name="description" content="Mike Anderson's visual archive on Mikesta.">
   <title>mike.photos — Mikesta</title>
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23182523'/><circle cx='50' cy='52' r='20' fill='%23f1d879'/><circle cx='50' cy='52' r='14' fill='%23182523'/><circle cx='70' cy='32' r='6' fill='%23e76f51'/></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +15,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+  <!-- Film Grain Layer -->
+  <div class="film-grain-layer"></div>
+
   <!-- Top Navigation Bar -->
   <header class="navbar">
     <div class="nav-container">
@@ -24,7 +29,7 @@
       <div class="search-wrapper">
         <label class="search-bar">
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-          <input type="search" placeholder="Search moments, people, places... (Press /)" aria-label="Search" autocomplete="off">
+          <input type="search" placeholder="Search circle... (Press /)" aria-label="Search" autocomplete="off">
           <button type="button" class="search-clear-btn" id="searchClearBtn" aria-label="Clear search">
             <i class="fa-solid fa-circle-xmark"></i>
           </button>
@@ -33,24 +38,34 @@
       </div>
 
       <nav class="nav-icons" aria-label="Primary navigation">
+        <!-- Ambient Procedural Circle Radio -->
+        <button class="ambient-radio-btn" id="ambientRadioBtn" title="Toggle Ambient Audio Radio (R)" aria-label="Toggle Ambient Audio Radio">
+          <div class="eq-bars">
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+          </div>
+          <span class="ambient-radio-label">Circle Radio</span>
+        </button>
+
         <!-- Command Palette Shortcut Pill -->
         <button class="kbd-nav-btn" id="kbdBtn" title="Command Palette & Shortcuts" aria-label="Command Palette">
           <span>⌘K</span>
         </button>
 
         <!-- Vibe Switcher -->
-        <button class="vibe-picker-btn" id="vibeBtn" title="Switch vibe" aria-label="Switch vibe">
+        <button class="vibe-picker-btn" id="vibeBtn" title="Switch aesthetic vibe" aria-label="Switch aesthetic vibe">
           <span class="vibe-dot"></span>
           <span class="vibe-name">Warm Paper</span>
         </button>
 
         <!-- Sound Vibes Toggle -->
-        <button class="nav-btn sound-btn" id="soundBtn" title="Toggle audio vibes" aria-label="Toggle audio vibes">
+        <button class="nav-btn sound-btn" id="soundBtn" title="Toggle audio vibes (M)" aria-label="Toggle audio vibes">
           <i class="fa-solid fa-volume-high"></i>
         </button>
 
         <!-- Direct Messages / Chat -->
-        <button class="nav-btn" id="chatBtn" title="Direct Messages" aria-label="Direct Messages">
+        <button class="nav-btn" id="chatBtn" title="Direct Messages (D)" aria-label="Direct Messages">
           <i class="fa-regular fa-paper-plane"></i>
           <span class="badge-dot" id="chatBadge"></span>
         </button>
@@ -67,7 +82,7 @@
         </button>
 
         <!-- Active Profile Nav -->
-        <a class="nav-btn profile-nav active-profile" href="profile.html" title="Your profile" aria-label="Your profile">
+        <a class="nav-btn profile-nav active-profile" href="profile.html" title="Your profile (P)" aria-label="Your profile">
           <img src="https://i.pravatar.cc/100?img=10" alt="Mike's profile">
         </a>
       </nav>

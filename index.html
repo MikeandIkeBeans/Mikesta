@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#182523">
   <meta name="description" content="Mikesta is a warm, tactile visual space for sharing moments and ideas worth keeping.">
   <title>Mikesta — Your visual circle</title>
+  <link rel="manifest" href="manifest.json">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23182523'/><circle cx='50' cy='52' r='20' fill='%23f1d879'/><circle cx='50' cy='52' r='14' fill='%23182523'/><circle cx='70' cy='32' r='6' fill='%23e76f51'/></svg>">
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +15,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+  <!-- Film Grain Atmosphere Layer -->
+  <div class="film-grain-layer"></div>
+
   <!-- Top Navigation Bar -->
   <header class="navbar">
     <div class="nav-container">
@@ -24,7 +29,7 @@
       <div class="search-wrapper">
         <label class="search-bar">
           <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-          <input type="search" placeholder="Search moments, people, places... (Press /)" aria-label="Search" autocomplete="off">
+          <input type="search" placeholder="Search circle... (Press /)" aria-label="Search" autocomplete="off">
           <button type="button" class="search-clear-btn" id="searchClearBtn" aria-label="Clear search">
             <i class="fa-solid fa-circle-xmark"></i>
           </button>
@@ -33,24 +38,34 @@
       </div>
 
       <nav class="nav-icons" aria-label="Primary navigation">
+        <!-- Ambient Procedural Circle Radio -->
+        <button class="ambient-radio-btn" id="ambientRadioBtn" title="Toggle Ambient Audio Radio (R)" aria-label="Toggle Ambient Audio Radio">
+          <div class="eq-bars">
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+          </div>
+          <span class="ambient-radio-label">Circle Radio</span>
+        </button>
+
         <!-- Command Palette Shortcut Pill -->
         <button class="kbd-nav-btn" id="kbdBtn" title="Command Palette & Shortcuts" aria-label="Command Palette">
           <span>⌘K</span>
         </button>
 
         <!-- Vibe / Theme Switcher -->
-        <button class="vibe-picker-btn" id="vibeBtn" title="Switch vibe" aria-label="Switch vibe">
+        <button class="vibe-picker-btn" id="vibeBtn" title="Switch aesthetic vibe" aria-label="Switch aesthetic vibe">
           <span class="vibe-dot"></span>
           <span class="vibe-name">Warm Paper</span>
         </button>
 
         <!-- Sound Vibes Toggle -->
-        <button class="nav-btn sound-btn" id="soundBtn" title="Toggle audio vibes" aria-label="Toggle audio vibes">
+        <button class="nav-btn sound-btn" id="soundBtn" title="Toggle audio vibes (M)" aria-label="Toggle audio vibes">
           <i class="fa-solid fa-volume-high"></i>
         </button>
 
         <!-- Direct Messages / Chat -->
-        <button class="nav-btn" id="chatBtn" title="Direct Messages" aria-label="Direct Messages">
+        <button class="nav-btn" id="chatBtn" title="Direct Messages (D)" aria-label="Direct Messages">
           <i class="fa-regular fa-paper-plane"></i>
           <span class="badge-dot active" id="chatBadge"></span>
         </button>
@@ -92,6 +107,15 @@
         </button>
       </section>
 
+      <!-- Curated "Moment of the Day" Editorial Banner -->
+      <section class="moment-of-the-day-banner" aria-label="Moment of the Day">
+        <span class="curator-pick-badge"><i class="fa-solid fa-star"></i> Curator Pick</span>
+        <p class="moment-spotlight-text">
+          <strong>Rockaway Tide Study</strong> by <em>mike.photos</em> · Selected for exceptional color temperature and stillness.
+        </p>
+        <button type="button" class="moment-spotlight-view-btn" id="spotlightViewBtn">Inspect Moment →</button>
+      </section>
+
       <!-- Explore Tag Pills Filter -->
       <div class="explore-tags" role="toolbar" aria-label="Explore tags">
         <button class="tag-pill active" data-tag="all">All</button>
@@ -109,7 +133,7 @@
           <button>Watch all <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
         </div>
         <div class="stories-container">
-          <button class="story-item story-add" aria-label="Add your story">
+          <button class="story-item story-add" aria-label="Add to your story">
             <span class="story-ring">
               <img src="https://i.pravatar.cc/150?img=10" alt="Your story">
               <b>+</b>
@@ -151,7 +175,7 @@
 
       <!-- Post Feed Stream -->
       <section class="feed-section" id="explore">
-        <!-- Post 1: Mike Anderson -->
+        <!-- Post 1: Multi-Image Carousel Post (Mike Anderson) -->
         <article class="post-card" data-post-id="post-1" data-tags="all featured coast">
           <div class="post-header">
             <div class="user-info" data-creator="mike.photos">
@@ -163,12 +187,33 @@
             </div>
             <button class="post-options" aria-label="More options"><i class="fa-solid fa-ellipsis"></i></button>
           </div>
-          <div class="post-image" title="Double click to like">
-            <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85" alt="Warm light over waves at Rockaway Beach">
+
+          <!-- Multi-Slide Photo Carousel -->
+          <div class="carousel-container" title="Double click to like · Swipe to view series">
+            <button type="button" class="carousel-arrow prev" aria-label="Previous photo"><i class="fa-solid fa-chevron-left"></i></button>
+            <button type="button" class="carousel-arrow next" aria-label="Next photo"><i class="fa-solid fa-chevron-right"></i></button>
+            <span class="carousel-counter">1/3</span>
+            <div class="carousel-track">
+              <div class="carousel-slide">
+                <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85" alt="Atlantic waves breaking at Rockaway Beach">
+              </div>
+              <div class="carousel-slide">
+                <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1000&q=85" alt="Dune grasses in morning sea mist">
+              </div>
+              <div class="carousel-slide">
+                <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1000&q=85" alt="Warm boardwalk light after sunset">
+              </div>
+            </div>
+            <div class="carousel-dots">
+              <span class="carousel-dot active"></span>
+              <span class="carousel-dot"></span>
+              <span class="carousel-dot"></span>
+            </div>
             <div class="camera-badge" data-post-id="post-1">
               <i class="fa-solid fa-camera"></i> <span>Leica M11 · 35mm f/1.4</span>
             </div>
           </div>
+
           <div class="post-actions">
             <div class="action-buttons">
               <div class="like-btn-wrapper">
@@ -400,7 +445,6 @@
               <img src="https://i.pravatar.cc/100?img=10" alt="Mike's profile" class="detail-avatar">
               <strong>mike.photos</strong>
             </div>
-            <!-- Interactive Atmosphere Filter Selector -->
             <div>
               <div class="filter-selector-title">Atmosphere Filter</div>
               <div class="filter-pills" id="filterPills"></div>
