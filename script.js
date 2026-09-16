@@ -1110,6 +1110,7 @@ const COMMANDS = [
   { key: 'R', label: 'Toggle Circle Radio', action: () => sounds.toggleAmbientRadio() },
   { key: 'T', label: 'Cycle aesthetic vibe (theme)', action: () => cycleTheme() },
   { key: 'M', label: 'Toggle sound effects', action: () => toggleSound() },
+  { key: 'B', label: 'Open Hardcover Monograph Photobook', action: () => openMonograph(0) },
   { key: '?', label: 'Show visual shortcuts guide', action: () => openKeyboardGuide() },
   { key: 'P', label: 'Go to your profile', action: () => window.location.href = 'profile.html' },
   { key: 'H', label: 'Go to home feed', action: () => window.location.href = 'index.html' },
@@ -1800,16 +1801,54 @@ function setupUpload() {
     sounds.pop();
   };
 
+  let currentAspectRatio = '1/1';
+  let hasDateStamp = false;
+  let darkroomValues = { exposure: 0, contrast: 0, warmth: 0, saturation: 0 };
+
+  const updatePreviewFilters = () => {
+    const b = 1 + (darkroomValues.exposure / 100);
+    const c = 1 + (darkroomValues.contrast / 100);
+    const s = 1 + (darkroomValues.saturation / 100);
+    const w = darkroomValues.warmth;
+    let custom = `brightness(${b}) contrast(${c}) saturate(${s})`;
+    if (w > 0) {
+      custom += ` sepia(${w / 100}) hue-rotate(-${w * 0.2}deg)`;
+    } else if (w < 0) {
+      custom += ` hue-rotate(${Math.abs(w) * 0.4}deg)`;
+    }
+    preview.style.filter = custom;
+  };
+
   const reset = () => {
     if (!modal) return;
     area.style.display = 'flex';
     previewArea.style.display = 'none';
     preview.removeAttribute('src');
     preview.className = '';
+    preview.style.filter = '';
+    preview.style.aspectRatio = '';
     currentSelectedFilter = '';
+    currentAspectRatio = '1/1';
+    hasDateStamp = false;
+    darkroomValues = { exposure: 0, contrast: 0, warmth: 0, saturation: 0 };
     input.value = '';
     $('#captionInput').value = '';
     $('#locationInput').value = '';
+
+    const previewDateStamp = $('#previewDateStamp');
+    if (previewDateStamp) previewDateStamp.style.display = 'none';
+    const checkDateStamp = $('#checkDateStamp');
+    if (checkDateStamp) checkDateStamp.checked = false;
+
+    $$('.ratio-chip').forEach((c, idx) => c.classList.toggle('active', idx === 0));
+    if ($('#sliderExposure')) $('#sliderExposure').value = 0;
+    if ($('#sliderContrast')) $('#sliderContrast').value = 0;
+    if ($('#sliderWarmth')) $('#sliderWarmth').value = 0;
+    if ($('#sliderSaturation')) $('#sliderSaturation').value = 0;
+    if ($('#exposureVal')) $('#exposureVal').textContent = '0';
+    if ($('#contrastVal')) $('#contrastVal').textContent = '0';
+    if ($('#warmthVal')) $('#warmthVal').textContent = '0';
+    if ($('#saturationVal')) $('#saturationVal').textContent = '0';
   };
 
   const closeModal = () => {
@@ -1828,6 +1867,73 @@ function setupUpload() {
   on(select, 'click', () => input.click());
 
   setupFilterChips();
+
+  // Aspect ratio chips
+  $$('.ratio-chip').forEach((chip) => {
+    on(chip, 'click', () => {
+      $$('.ratio-chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentAspectRatio = chip.dataset.ratio || '1/1';
+      preview.style.aspectRatio = currentAspectRatio;
+      sounds.pop();
+    });
+  });
+
+  // Darkroom accordion toggle
+  const darkroomBtn = $('#darkroomToggleBtn');
+  const darkroomPanel = $('#darkroomPanel');
+  const darkroomChevron = $('#darkroomChevron');
+  if (darkroomBtn && darkroomPanel) {
+    on(darkroomBtn, 'click', () => {
+      const open = darkroomPanel.classList.toggle('open');
+      if (darkroomChevron) darkroomChevron.style.transform = open ? 'rotate(180deg)' : 'none';
+      sounds.pop();
+    });
+  }
+
+  // Darkroom parameter sliders
+  const sliderExp = $('#sliderExposure');
+  const sliderCon = $('#sliderContrast');
+  const sliderWarm = $('#sliderWarmth');
+  const sliderSat = $('#sliderSaturation');
+
+  const onSliderChange = () => {
+    darkroomValues.exposure = Number(sliderExp?.value || 0);
+    darkroomValues.contrast = Number(sliderCon?.value || 0);
+    darkroomValues.warmth = Number(sliderWarm?.value || 0);
+    darkroomValues.saturation = Number(sliderSat?.value || 0);
+
+    if ($('#exposureVal')) $('#exposureVal').textContent = darkroomValues.exposure > 0 ? `+${darkroomValues.exposure}` : darkroomValues.exposure;
+    if ($('#contrastVal')) $('#contrastVal').textContent = darkroomValues.contrast > 0 ? `+${darkroomValues.contrast}` : darkroomValues.contrast;
+    if ($('#warmthVal')) $('#warmthVal').textContent = darkroomValues.warmth > 0 ? `+${darkroomValues.warmth}` : darkroomValues.warmth;
+    if ($('#saturationVal')) $('#saturationVal').textContent = darkroomValues.saturation > 0 ? `+${darkroomValues.saturation}` : darkroomValues.saturation;
+
+    updatePreviewFilters();
+  };
+
+  [sliderExp, sliderCon, sliderWarm, sliderSat].forEach((s) => on(s, 'input', onSliderChange));
+
+  const checkDateStamp = $('#checkDateStamp');
+  const previewDateStamp = $('#previewDateStamp');
+  if (checkDateStamp && previewDateStamp) {
+    on(checkDateStamp, 'change', () => {
+      hasDateStamp = checkDateStamp.checked;
+      previewDateStamp.style.display = hasDateStamp ? 'block' : 'none';
+      sounds.pop();
+    });
+  }
+
+  const resetDarkroom = $('#resetDarkroomBtn');
+  if (resetDarkroom) {
+    on(resetDarkroom, 'click', () => {
+      if (sliderExp) sliderExp.value = 0;
+      if (sliderCon) sliderCon.value = 0;
+      if (sliderWarm) sliderWarm.value = 0;
+      if (sliderSat) sliderSat.value = 0;
+      onSliderChange();
+      sounds.pop();
+    });
+  }
 
   const previewFile = (file) => {
     if (!file?.type.startsWith('image/')) {
@@ -1870,10 +1976,13 @@ function setupUpload() {
       location,
       imageSrc: preview.src,
       username: 'mike.photos',
-      filter: currentSelectedFilter
+      filter: currentSelectedFilter,
+      customFilter: preview.style.filter || '',
+      aspectRatio: currentAspectRatio,
+      dateStamp: hasDateStamp
     });
     closeModal();
-    sounds.shutter();
+    triggerShutterFlash();
     announce('Your moment is live in your circle.', 'success');
   });
 }
@@ -1908,6 +2017,9 @@ function createNewPost({
   imageSrc = '',
   username = 'mike.photos',
   filter = '',
+  customFilter = '',
+  aspectRatio = '1/1',
+  dateStamp = false,
   createdAt = new Date().toISOString()
 }, persist = true) {
   const feed = $('.feed-section');
@@ -1929,8 +2041,9 @@ function createNewPost({
       </div>
       <button class="post-options" aria-label="More options"><i class="fa-solid fa-ellipsis"></i></button>
     </div>
-    <div class="post-image" title="Double click to like">
-      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(caption || 'Moment on Mikesta')}" class="${escapeHtml(filter)}">
+    <div class="post-image" title="Double click to like" style="${aspectRatio ? `aspect-ratio: ${aspectRatio};` : ''}">
+      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(caption || 'Moment on Mikesta')}" class="${escapeHtml(filter)}" style="${customFilter ? `filter: ${customFilter};` : ''}${aspectRatio ? `aspect-ratio: ${aspectRatio};` : ''}">
+      ${dateStamp ? `<div class="analog-date-stamp">'26 09 15</div>` : ''}
       <div class="camera-badge" data-post-id="${id}">
         <i class="fa-solid fa-camera"></i> <span>Leica M11 · 35mm</span>
       </div>
@@ -1967,7 +2080,7 @@ function createNewPost({
   updatePostCounts(post, state.postStats[id]);
 
   if (persist) {
-    state.posts = [{ id, caption, location, imageSrc, username, filter, createdAt }, ...state.posts.filter((p) => p.id !== id)];
+    state.posts = [{ id, caption, location, imageSrc, username, filter, customFilter, aspectRatio, dateStamp, createdAt }, ...state.posts.filter((p) => p.id !== id)];
     saveState();
     post.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -2279,7 +2392,12 @@ function openLightbox(postData) {
    Profile Page Functions
    ========================================================================== */
 function setupProfilePage() {
-  const edit = $('.button-outline');
+  const monograph = $('#monographBtn');
+  if (monograph) {
+    on(monograph, 'click', () => openMonograph(0));
+  }
+
+  const edit = $('#editProfileBtn') || $('.button-outline');
   if (edit) {
     on(edit, 'click', () => {
       const body = document.createElement('form');
@@ -2859,6 +2977,7 @@ function openKeyboardGuide() {
       { key: '?', desc: 'Show this shortcuts guide' },
       { key: 'Z', desc: 'Toggle Zen reading focus mode' },
       { key: 'W', desc: 'Explore World Moments Map' },
+      { key: 'B', desc: 'Open Hardcover Monograph photobook' },
       { key: 'E', desc: 'Export fine art postcard' },
       { key: 'C', desc: 'Camera shutter snapshot flash' },
       { key: 'G', desc: 'Toggle analog film grain texture' },
@@ -3040,6 +3159,166 @@ function renderStacksProfileGrid() {
       openDialog(stack.title, body, 'Moodboard Stack');
     });
   });
+}
+
+/* ==========================================================================
+   Hardcover Monograph Photobook Studio
+   ========================================================================== */
+const MONOGRAPH_SPREADS = [
+  {
+    plate: 'Plate I',
+    title: 'Rockaway Tide Study',
+    date: 'September 2026',
+    coords: '40.5853° N, 73.8160° W',
+    camera: 'Leica M11 · Summilux 35mm f/1.4',
+    light: 'Morning Marine Fog & Horizon Light',
+    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=85',
+    note: '“The tide recedes slowly on the south peninsula, leaving ripples in the sandbar that catch pure blue sky. Shot before the city noise awakens.”'
+  },
+  {
+    plate: 'Plate II',
+    title: 'Alfama Passage in Ochre',
+    date: 'August 2026',
+    coords: '38.7118° N, 9.1306° W',
+    camera: 'Hasselblad 500C/M · 80mm Planar',
+    light: 'Afternoon Reflected Terracotta',
+    image: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=1000&q=85',
+    note: '“Steep limestone steps through the oldest district. Laundry hanging between pastel balconies, carrying the quiet rhythm of the river estuary.”'
+  },
+  {
+    plate: 'Plate III',
+    title: 'Greenpoint Ceramic Study',
+    date: 'July 2026',
+    coords: '40.7282° N, 73.9537° W',
+    camera: 'Contax G2 · Planar 45mm f/2',
+    light: 'North-Facing Window Light',
+    image: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1000&q=85',
+    note: '“Earthenware drying on pine slats. The geometry of the shadows mirrors the curve of the vessels. A meditation on raw texture and time.”'
+  },
+  {
+    plate: 'Plate IV',
+    title: 'Cathedral Canopy of Redwoods',
+    date: 'June 2026',
+    coords: '41.2132° N, 124.0046° W',
+    camera: 'Mamiya 7II · 65mm f/4',
+    light: 'Filtered Coastal Redwoods Mist',
+    image: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1000&q=85',
+    note: '“Standing beneath two-thousand-year-old giants. The air smells of cedar, rain, and ancient stone. Silence here has physical weight.”'
+  },
+  {
+    plate: 'Plate V',
+    title: 'Kyoto Alley at Dusk',
+    date: 'May 2026',
+    coords: '35.0116° N, 135.7681° E',
+    camera: 'Leica MP · 50mm Summicron',
+    light: 'Warm Paper Lantern Glow',
+    image: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=1000&q=85',
+    note: '“The transition hour in Gion when cedar lattices soften into shadow. A solitary figure rounds the corner under rain-slicked paving.”'
+  }
+];
+
+let monographIndex = 0;
+
+function openMonograph(idx = 0) {
+  monographIndex = idx;
+  let modal = $('#monographModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'monographModal';
+    modal.className = 'monograph-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Hardcover Monograph Photobook');
+
+    modal.innerHTML = `
+      <div class="monograph-container">
+        <div class="monograph-nav-bar">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-book-bookmark" style="color: var(--accent);"></i>
+            <strong style="font-size: 13px; font-weight: 800;">MIKESTA MONOGRAPH · VOL. I</strong>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="monographCounter" style="font-family: 'DM Mono', monospace; font-size: 11px; opacity: 0.8;"></span>
+            <button type="button" class="close-modal" id="closeMonographModal" style="color: #fff;" aria-label="Close Monograph">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="monograph-book" id="monographBook">
+          <div class="monograph-page-left">
+            <div class="monograph-photo-frame">
+              <img id="monographImg" src="" alt="">
+            </div>
+          </div>
+          <div class="monograph-page-right">
+            <div>
+              <span class="monograph-header-meta" id="monographPlate"></span>
+              <h2 class="monograph-plate-title" id="monographTitle"></h2>
+              <p class="monograph-body-text" id="monographNote"></p>
+            </div>
+            <div>
+              <div class="monograph-specs-grid">
+                <div><strong>EXPOSURE</strong><br><span id="monographCamera"></span></div>
+                <div><strong>COORDINATES</strong><br><span id="monographCoords"></span></div>
+                <div><strong>LIGHT STUDY</strong><br><span id="monographLight"></span></div>
+                <div><strong>CURATED ARCHIVE</strong><br><span id="monographDate"></span></div>
+              </div>
+              <div class="monograph-page-number">
+                <button type="button" class="button-outline" id="monographPrevBtn" style="padding: 4px 10px; font-size: 11px;">← Prev Plate</button>
+                <span>✦ MIKESTA MONOGRAPH ✦</span>
+                <button type="button" class="button-outline" id="monographNextBtn" style="padding: 4px 10px; font-size: 11px;">Next Plate →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    on($('#closeMonographModal', modal), 'click', () => modal.classList.remove('active'));
+    on(modal, 'click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+
+    on($('#monographPrevBtn', modal), () => {
+      if (monographIndex > 0) {
+        monographIndex--;
+        updateMonographSpread();
+        sounds.pop();
+      }
+    });
+
+    on($('#monographNextBtn', modal), () => {
+      if (monographIndex < MONOGRAPH_SPREADS.length - 1) {
+        monographIndex++;
+        updateMonographSpread();
+        sounds.pop();
+      }
+    });
+  }
+
+  const updateMonographSpread = () => {
+    const s = MONOGRAPH_SPREADS[monographIndex];
+    if (!s) return;
+    $('#monographImg', modal).src = s.image;
+    $('#monographPlate', modal).textContent = `${s.plate} · ${s.date}`;
+    $('#monographTitle', modal).textContent = s.title;
+    $('#monographNote', modal).textContent = s.note;
+    $('#monographCamera', modal).textContent = s.camera;
+    $('#monographCoords', modal).textContent = s.coords;
+    $('#monographLight', modal).textContent = s.light;
+    $('#monographDate', modal).textContent = s.date;
+    $('#monographCounter', modal).textContent = `Plate ${monographIndex + 1} of ${MONOGRAPH_SPREADS.length}`;
+
+    $('#monographPrevBtn', modal).disabled = monographIndex === 0;
+    $('#monographNextBtn', modal).disabled = monographIndex === MONOGRAPH_SPREADS.length - 1;
+  };
+
+  updateMonographSpread();
+  modal.classList.add('active');
+  sounds.pop();
+  announce('Hardcover Monograph opened.');
 }
 
 /* ==========================================================================
@@ -3251,6 +3530,7 @@ on(document, 'keydown', (event) => {
     $('#worldMapModal')?.classList.remove('active');
     $('#postcardModal')?.classList.remove('active');
     $('#keyboardGuideModal')?.classList.remove('active');
+    $('#monographModal')?.classList.remove('active');
     return;
   }
 
@@ -3273,6 +3553,8 @@ on(document, 'keydown', (event) => {
     triggerShutterFlash();
   } else if (event.key === 'w' || event.key === 'W') {
     openWorldMap();
+  } else if (event.key === 'b' || event.key === 'B') {
+    openMonograph(0);
   } else if (event.key === 'e' || event.key === 'E') {
     const post = $('.post-card');
     openPostcardExport(post ? getPostId(post) : 'post-1');

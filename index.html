@@ -440,6 +440,7 @@
         <div class="preview-area" id="previewArea">
           <div class="preview-image-box">
             <img id="previewImage" src="" alt="Post preview">
+            <div class="analog-date-stamp" id="previewDateStamp" style="display: none;">'26 09 15</div>
           </div>
           <div class="post-details">
             <div class="detail-header">
@@ -447,8 +448,48 @@
               <strong>mike.photos</strong>
             </div>
             <div>
+              <div class="filter-selector-title">Aspect Ratio</div>
+              <div class="aspect-ratio-selector" id="ratioSelector">
+                <button type="button" class="ratio-chip active" data-ratio="1/1">1:1 Square</button>
+                <button type="button" class="ratio-chip" data-ratio="4/5">4:5 Portrait</button>
+                <button type="button" class="ratio-chip" data-ratio="16/9">16:9 Cinema</button>
+                <button type="button" class="ratio-chip" data-ratio="3/2">3:2 Classic</button>
+              </div>
+            </div>
+            <div>
               <div class="filter-selector-title">Atmosphere Filter</div>
               <div class="filter-pills" id="filterPills"></div>
+            </div>
+            <div>
+              <button type="button" class="darkroom-toggle-btn" id="darkroomToggleBtn">
+                <span><i class="fa-solid fa-sliders"></i> Darkroom Fine-Tuning</span>
+                <i class="fa-solid fa-chevron-down" id="darkroomChevron"></i>
+              </button>
+              <div class="darkroom-panel" id="darkroomPanel">
+                <div class="darkroom-slider-row">
+                  <div class="darkroom-slider-label"><span>Exposure</span><span id="exposureVal">0</span></div>
+                  <input type="range" id="sliderExposure" min="-50" max="50" value="0">
+                </div>
+                <div class="darkroom-slider-row">
+                  <div class="darkroom-slider-label"><span>Contrast</span><span id="contrastVal">0</span></div>
+                  <input type="range" id="sliderContrast" min="-50" max="50" value="0">
+                </div>
+                <div class="darkroom-slider-row">
+                  <div class="darkroom-slider-label"><span>Warmth</span><span id="warmthVal">0</span></div>
+                  <input type="range" id="sliderWarmth" min="-50" max="50" value="0">
+                </div>
+                <div class="darkroom-slider-row">
+                  <div class="darkroom-slider-label"><span>Saturation</span><span id="saturationVal">0</span></div>
+                  <input type="range" id="sliderSaturation" min="-50" max="50" value="0">
+                </div>
+                <div class="darkroom-toggles-row">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="checkbox" id="checkDateStamp">
+                    <span>'90s Amber Date Stamp</span>
+                  </label>
+                  <button type="button" class="link-btn-text" id="resetDarkroomBtn" style="font-size: 11px;">Reset</button>
+                </div>
+              </div>
             </div>
             <textarea placeholder="Write a thoughtful caption..." id="captionInput"></textarea>
             <input type="text" placeholder="Add a location (e.g. Tribeca, NY)" id="locationInput">
