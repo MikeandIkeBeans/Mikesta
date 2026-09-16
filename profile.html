@@ -1,5 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Mike's Mikesta profile."><title>mike.photos — Mikesta</title><link rel="stylesheet" href="styles.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head>
-<body><header class="navbar"><div class="nav-container"><a class="logo" href="index.html" aria-label="Mikesta home"><span class="logo-mark"><i class="fa-solid fa-camera"></i></span><span class="logo-word">Mikesta</span></a><label class="search-bar"><i class="fa-solid fa-magnifying-glass"></i><input type="search" placeholder="Search moments, people, places" aria-label="Search"></label><nav class="nav-icons" aria-label="Primary navigation"><a class="nav-btn" href="index.html#explore" title="Explore" aria-label="Explore"><i class="fa-regular fa-compass"></i></a><button class="nav-btn" title="Notifications" aria-label="Notifications"><i class="fa-regular fa-heart"></i></button><a class="nav-btn profile-nav active-profile" href="profile.html" title="Your profile" aria-label="Your profile"><img src="https://i.pravatar.cc/100?img=10" alt="Mike's profile"></a></nav></div></header>
-<main class="profile-page"><section class="profile-hero"><div class="profile-hero-inner"><img src="https://i.pravatar.cc/300?img=10" alt="Mike Anderson" class="profile-large-avatar"><div class="profile-headline"><div class="profile-title-row"><div><p class="kicker">Creator profile</p><h1>mike.photos <i class="fa-solid fa-circle-check verified"></i></h1></div><button class="button-outline">Edit profile</button></div><p class="profile-bio">Developer, creator, and collector of small beautiful moments.<br>Building Mikesta in public.</p><div class="profile-stats"><span><strong>24</strong> posts</span><span><strong>1.8k</strong> followers</span><span><strong>286</strong> following</span></div></div></div></section><section class="profile-content"><div class="profile-tabs"><button class="active"><i class="fa-solid fa-table-cells"></i> Posts</button><button><i class="fa-regular fa-bookmark"></i> Saved</button></div><div class="profile-grid"><img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" alt="Ocean light"><img src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=800&q=80" alt="Modern red architecture"><img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=800&q=80" alt="Creative workspace"><img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=800&q=80" alt="Person looking over a landscape"><img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80" alt="Coffee on a cafe table"><img src="https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80" alt="Sunlit office interior"></div></section></main><footer class="site-footer"><span>© 2026 MIKESTA</span><a href="index.html">Back to feed ↑</a></footer><script src="script.js"></script></body></html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Mike Anderson's visual archive on Mikesta.">
+  <title>mike.photos — Mikesta</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a class="logo" href="index.html" aria-label="Mikesta home">
+        <span class="logo-mark"><i class="fa-solid fa-camera" aria-hidden="true"></i></span>
+        <span class="logo-word">Mikesta</span>
+      </a>
+
+      <div class="search-wrapper">
+        <label class="search-bar">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="search" placeholder="Search moments, people, places..." aria-label="Search" autocomplete="off">
+          <button type="button" class="search-clear-btn" id="searchClearBtn" aria-label="Clear search">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </button>
+        </label>
+        <div class="search-dropdown" id="searchDropdown"></div>
+      </div>
+
+      <nav class="nav-icons" aria-label="Primary navigation">
+        <!-- Vibe Switcher -->
+        <button class="vibe-picker-btn" id="vibeBtn" title="Switch vibe" aria-label="Switch vibe">
+          <span class="vibe-dot"></span>
+          <span class="vibe-name">Warm Paper</span>
+        </button>
+
+        <!-- Sound Vibes Toggle -->
+        <button class="nav-btn sound-btn" id="soundBtn" title="Toggle audio vibes" aria-label="Toggle audio vibes">
+          <i class="fa-solid fa-volume-high"></i>
+        </button>
+
+        <!-- Explore Anchor -->
+        <a class="nav-btn" href="index.html#explore" title="Explore" aria-label="Explore">
+          <i class="fa-regular fa-compass"></i>
+        </a>
+
+        <!-- Notifications -->
+        <button class="nav-btn" title="Notifications" aria-label="Notifications" id="notifBtn">
+          <i class="fa-regular fa-heart"></i>
+          <span class="badge-dot" id="notifBadge"></span>
+        </button>
+
+        <!-- Active Profile Nav -->
+        <a class="nav-btn profile-nav active-profile" href="profile.html" title="Your profile" aria-label="Your profile">
+          <img src="https://i.pravatar.cc/100?img=10" alt="Mike's profile">
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Profile Page Content -->
+  <main class="profile-page">
+    <section class="profile-hero">
+      <div class="profile-hero-inner">
+        <img src="https://i.pravatar.cc/300?img=10" alt="Mike Anderson" class="profile-large-avatar">
+        <div class="profile-headline">
+          <div class="profile-title-row">
+            <div>
+              <p class="kicker">Creator archive</p>
+              <h1>mike.photos <i class="fa-solid fa-circle-check verified" aria-label="Verified"></i></h1>
+            </div>
+            <button class="button-outline">Edit profile</button>
+          </div>
+          <p class="profile-bio">Developer, creator, and collector of small beautiful moments.<br>Building Mikesta in public.</p>
+          <div class="profile-stats">
+            <span><strong>24</strong> moments</span>
+            <span><strong>1.8k</strong> circle followers</span>
+            <span><strong>286</strong> following</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="profile-content">
+      <div class="profile-tabs">
+        <button class="active"><i class="fa-solid fa-table-cells"></i> Moments</button>
+        <button><i class="fa-regular fa-bookmark"></i> Saved</button>
+      </div>
+
+      <!-- Post Grid -->
+      <div class="profile-grid">
+        <div class="profile-grid-item">
+          <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80" alt="Ocean light at Rockaway Beach">
+          <div class="grid-hover-overlay">
+            <span><i class="fa-solid fa-heart"></i> 1.2k</span>
+            <span><i class="fa-solid fa-comment"></i> 46</span>
+          </div>
+        </div>
+        <div class="profile-grid-item">
+          <img src="https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=800&q=80" alt="Modern red architecture geometry">
+          <div class="grid-hover-overlay">
+            <span><i class="fa-solid fa-heart"></i> 890</span>
+            <span><i class="fa-solid fa-comment"></i> 22</span>
+          </div>
+        </div>
+        <div class="profile-grid-item">
+          <img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=800&q=80" alt="Creative wood and concrete workspace">
+          <div class="grid-hover-overlay">
+            <span><i class="fa-solid fa-heart"></i> 640</span>
+            <span><i class="fa-solid fa-comment"></i> 15</span>
+          </div>
+        </div>
+        <div class="profile-grid-item">
+          <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=800&q=80" alt="Watching the fog roll over coastal hills">
+          <div class="grid-hover-overlay">
+            <span><i class="fa-solid fa-heart"></i> 1.1k</span>
+            <span><i class="fa-solid fa-comment"></i> 38</span>
+          </div>
+        </div>
+        <div class="profile-grid-item">
+          <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80" alt="Morning coffee and notebook study">
+          <div class="grid-hover-overlay">
+            <span><i class="fa-solid fa-heart"></i> 415</span>
+            <span><i class="fa-solid fa-comment"></i> 11</span>
+          </div>
+        </div>
+        <div class="profile-grid-item">
+          <img src="https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=800&q=80" alt="Sunlit glass office interior">
+          <div class="grid-hover-overlay">
+            <span><i class="fa-solid fa-heart"></i> 720</span>
+            <span><i class="fa-solid fa-comment"></i> 19</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <span>© 2026 MIKESTA · DESIGNED WITH LOVE</span>
+    <a href="index.html">Back to feed ↑</a>
+  </footer>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-nav-bar" aria-label="Mobile navigation">
+    <a href="index.html" class="mobile-nav-item" aria-label="Home"><i class="fa-solid fa-house"></i></a>
+    <a href="index.html#explore" class="mobile-nav-item" aria-label="Explore"><i class="fa-regular fa-compass"></i></a>
+    <a href="index.html" class="mobile-nav-create" aria-label="Create post"><i class="fa-solid fa-plus"></i></a>
+    <button class="mobile-nav-item" id="mobileNotifBtn" aria-label="Notifications"><i class="fa-regular fa-heart"></i></button>
+    <a href="profile.html" class="mobile-nav-item active" aria-label="Profile"><i class="fa-regular fa-user"></i></a>
+  </nav>
+
+  <script src="script.js"></script>
+</body>
+</html>
