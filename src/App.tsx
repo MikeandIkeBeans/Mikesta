@@ -230,8 +230,8 @@ export default function App() {
     setDialog('likes');
   };
 
-  const handleSaveProfile = async (updates: Partial<UserProfile>) => {
-    await store.updateProfile(updates);
+  const handleSaveProfile = async (updates: Partial<UserProfile>, avatarFile?: File | null) => {
+    await store.updateProfile(updates, avatarFile);
     announce('Profile updated successfully');
   };
 
