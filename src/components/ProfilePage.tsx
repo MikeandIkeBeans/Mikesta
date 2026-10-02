@@ -105,10 +105,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <strong>{posts.length}</strong> posts
               </span>
               <span>
-                <strong>{isFollowing ? '843' : '842'}</strong> followers
+                <strong>{profile ? store.getFollowerCount(profile.id) : 0}</strong> followers
               </span>
               <span>
-                <strong>{isOwnProfile ? store.getSuggestions().filter((s) => s.following).length + 12 : '142'}</strong> following
+                <strong>{profile ? store.getFollowingCount(profile.id) : 0}</strong> following
               </span>
             </div>
           </div>

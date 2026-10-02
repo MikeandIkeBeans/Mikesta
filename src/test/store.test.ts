@@ -1,185 +1,101 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { store } from '../lib/store';
-
-describe('MikestaStore', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    store.resetToSeedData();
-  });
-
-  it('initializes with seed posts, stories, suggestions, and current user', () => {
-    const posts = store.getPosts();
-    expect(posts.length).toBeGreaterThanOrEqual(6);
-    expect(store.getCurrentUser()?.username).toBe('elena_lens');
-    expect(store.getStories().length).toBeGreaterThanOrEqual(4);
-    expect(store.getSuggestions().length).toBeGreaterThanOrEqual(4);
-  });
-
-  it('toggles like on a post and updates like count', () => {
-    const posts = store.getPosts();
-    const targetPost = posts[0];
-    const initialLikes = targetPost.likes;
-    const initialLiked = targetPost.liked;
-
-    const newLiked = store.toggleLike(targetPost.id);
-    expect(newLiked).toBe(!initialLiked);
-
-    const updatedPost = store.getPosts().find((p) => p.id === targetPost.id);
-    expect(updatedPost?.liked).toBe(!initialLiked);
-    expect(updatedPost?.likes).toBe(initialLiked ? initialLikes - 1 : initialLikes + 1);
-
-    // Toggle back
-    store.toggleLike(targetPost.id);
-    const revertedPost = store.getPosts().find((p) => p.id === targetPost.id);
-    expect(revertedPost?.liked).toBe(initialLiked);
-    expect(revertedPost?.likes).toBe(initialLikes);
-  });
-
-  it('toggles bookmark / save and updates saved posts list', () => {
-    const posts = store.getPosts();
-    const targetPost = posts[1]; // Initially not saved
-
-    store.toggleSave(targetPost.id);
-    expect(store.getSavedPosts().some((p) => p.id === targetPost.id)).toBe(true);
-
-    store.toggleSave(targetPost.id);
-    expect(store.getSavedPosts().some((p) => p.id === targetPost.id)).toBe(false);
-  });
-
-  it('adds a new comment and updates comment count on the post', async () => {
-    const posts = store.getPosts();
-    const targetPost = posts[0];
-    const initialCommentCount = targetPost.comments;
-
-    const comment = await store.addComment(targetPost.id, 'Stunning architectural framing!');
-    expect(comment.body).toBe('Stunning architectural framing!');
-    expect(comment.profiles?.username).toBe('elena_lens');
-
-    const updatedComments = store.getComments(targetPost.id);
-    expect(updatedComments.some((c) => c.body === 'Stunning architectural framing!')).toBe(true);
-
-    const updatedPost = store.getPosts().find((p) => p.id === targetPost.id);
-    expect(updatedPost?.comments).toBe(initialCommentCount + 1);
-  });
-
-  it('restores fresh seed fixtures after local mutations', async () => {
-    const targetPost = store.getPosts()[0];
-    const initialCommentCount = store.getComments(targetPost.id).length;
-
-    await store.addComment(targetPost.id, 'Temporary local comment');
-    expect(store.getComments(targetPost.id)).toHaveLength(initialCommentCount + 1);
-
-    store.resetToSeedData();
-
-    expect(store.getComments(targetPost.id)).toHaveLength(initialCommentCount);
-    expect(store.getPosts().find((post) => post.id === targetPost.id)?.comments).toBe(
-      targetPost.comments
-    );
-  });
-
-  it('rejects invalid comment lengths before changing local state', async () => {
-    const targetPost = store.getPosts()[0];
-    const initialCommentCount = store.getComments(targetPost.id).length;
-    const initialPostCount = targetPost.comments;
-
-    await expect(store.addComment(targetPost.id, '   ')).rejects.toThrow('Comment cannot be empty');
-    await expect(store.addComment(targetPost.id, 'x'.repeat(181))).rejects.toThrow(
-      'Comment must be 180 characters or fewer'
-    );
-
-    expect(store.getComments(targetPost.id)).toHaveLength(initialCommentCount);
-    expect(store.getPosts().find((post) => post.id === targetPost.id)?.comments).toBe(initialPostCount);
-  });
-
-  it('filters posts by search query across captions and usernames', () => {
-    const kyotoResults = store.getFilteredPosts('foryou', 'kyoto');
-    expect(kyotoResults.length).toBeGreaterThanOrEqual(1);
-    expect(kyotoResults[0].location).toContain('Kyoto');
-
-    const hashtagResults = store.getFilteredPosts('recent', 'minimalism');
-    expect(hashtagResults.length).toBeGreaterThanOrEqual(1);
-
-    const emptyResults = store.getFilteredPosts('recent', 'xyznonexistent123');
-    expect(emptyResults.length).toBe(0);
-  });
-
-  it('filters posts by following vs recent vs foryou', () => {
-    const followingPosts = store.getFilteredPosts('following');
-    expect(followingPosts.length).toBeGreaterThan(0);
-
-    const forYouPosts = store.getFilteredPosts('foryou');
-    expect(forYouPosts.length).toBe(store.getPosts().length);
-    // Highest engagement should be first in foryou
-    expect(forYouPosts[0].likes + forYouPosts[0].comments * 3).toBeGreaterThanOrEqual(
-      forYouPosts[forYouPosts.length - 1].likes + forYouPosts[forYouPosts.length - 1].comments * 3
-    );
-  });
-
-  it('toggles follow status and reflects in following list', () => {
-    const suggestions = store.getSuggestions();
-    const target = suggestions.find((s) => !s.following)!;
-
-    const isFollowing = store.toggleFollow(target.id);
-    expect(isFollowing).toBe(true);
-    expect(store.isFollowing(target.id)).toBe(true);
-
-    // Toggle back
-    store.toggleFollow(target.id);
-    expect(store.isFollowing(target.id)).toBe(false);
-  });
-
-  it('keeps likes, saves, and follows isolated when switching users', () => {
-    const likedPost = store.getPosts()[1];
-    const savedPost = store.getPosts()[0];
-    const followedUser = store.getSuggestions().find((suggestion) => !suggestion.following)!;
-
-    expect(likedPost.liked).toBe(true);
-    store.toggleSave(savedPost.id);
-    store.toggleFollow(followedUser.id);
-
-    store.switchUser(store.getAvailableProfiles()[1]);
-
-    expect(store.getPosts().find((post) => post.id === likedPost.id)?.liked).toBe(false);
-    expect(store.getSavedPosts().some((post) => post.id === savedPost.id)).toBe(false);
-    expect(store.isFollowing(followedUser.id)).toBe(false);
-
-    store.toggleLike(likedPost.id);
-    store.toggleSave(savedPost.id);
-    store.toggleFollow(followedUser.id);
-    store.switchUser(store.getAvailableProfiles()[0]);
-
-    expect(store.getPosts().find((post) => post.id === likedPost.id)?.liked).toBe(true);
-    expect(store.getSavedPosts().some((post) => post.id === savedPost.id)).toBe(true);
-    expect(store.isFollowing(followedUser.id)).toBe(true);
-  });
-
-  it('updates profile and updates author info across authored posts', async () => {
-    await store.updateProfile({
-      display_name: 'Elena R. Photography',
-      bio: 'New bio description test.',
-    });
-
-    expect(store.getCurrentUser()?.display_name).toBe('Elena R. Photography');
-    expect(store.getCurrentUser()?.bio).toBe('New bio description test.');
-
-    const authoredPosts = store.getUserPosts();
-    expect(authoredPosts[0].profiles?.display_name).toBe('Elena R. Photography');
-  });
-
-  it('creates and deletes a post', async () => {
-    const initialCount = store.getPosts().length;
-
-    const newPost = await store.createPost({
-      imageUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f',
-      caption: 'Brand new test moment #test',
-      location: 'Studio, SF',
-    });
-
-    expect(store.getPosts().length).toBe(initialCount + 1);
-    expect(store.getPosts()[0].id).toBe(newPost.id);
-
-    store.deletePost(newPost.id);
-    expect(store.getPosts().length).toBe(initialCount);
-    expect(store.getPosts().some((p) => p.id === newPost.id)).toBe(false);
-  });
+import { beforeEach, expect, it, vi } from 'vitest';
+import { MikestaStore } from '../lib/store';
+import { CURRENT_DEMO_USER, SEED_POSTS } from './fixtures';
+const mocks = vi.hoisted(() => ({ from: vi.fn(), getSession: vi.fn(), getUser: vi.fn(), signOut: vi.fn(), onAuthStateChange: vi.fn(), upload: vi.fn() }));
+vi.mock('../lib/supabase', () => ({ supabase: { from: mocks.from, auth: mocks, storage: { from: () => ({ upload: mocks.upload, getPublicUrl: () => ({ data: { publicUrl: 'https://example.com/upload.jpg' } }) }) } } }));
+let writeError: any;
+let readError: any;
+let rows: Record<string, any[]>;
+let state: MikestaStore;
+let eventCallback: (event: string) => void;
+function query(table: string) {
+  let action = ''; let payload: any;
+  const builder: any = {};
+  for (const method of ['select', 'eq', 'order', 'delete', 'insert', 'update']) builder[method] = (...args: any[]) => {
+    if (['delete', 'insert', 'update'].includes(method)) { action = method; payload = args[0]; }
+    return builder;
+  };
+  const result = () => ({ error: action ? writeError : readError, data: action ? { id: 99, created_at: new Date().toISOString(), ...payload } : rows[table] || [] });
+  builder.single = async () => result();
+  builder.then = (resolve: any, reject: any) => Promise.resolve(result()).then(resolve, reject);
+  return builder;
+}
+beforeEach(() => {
+  window.history.replaceState({}, '', '/');
+  vi.clearAllMocks(); localStorage.clear(); writeError = null; readError = null;
+  rows = { profiles: [{ ...CURRENT_DEMO_USER }], posts: structuredClone(SEED_POSTS), likes: [], comments: [], saved_posts: [], follows: [] };
+  mocks.getSession.mockResolvedValue({ data: { session: { user: CURRENT_DEMO_USER } }, error: null });
+  mocks.getUser.mockResolvedValue({ data: { user: CURRENT_DEMO_USER }, error: null });
+  mocks.signOut.mockResolvedValue({ error: null }); mocks.upload.mockResolvedValue({ error: null });
+  mocks.from.mockImplementation(query);
+  mocks.onAuthStateChange.mockImplementation((callback) => { eventCallback = callback; return { data: { subscription: { unsubscribe: vi.fn() } } }; });
+  state = new MikestaStore();
+});
+it('shows an expired confirmation redirect instead of silently returning to sign in', async () => {
+  window.history.replaceState({}, '', '/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid');
+  mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+  await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('error');
+  expect(state.getSyncError()).toContain('already used');
+  expect(state.getCurrentUser()).toBeNull();
+  expect(window.location.hash).toBe('');
+  await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('signedOut');
+  expect(state.getSyncError()).toBe('');
+});
+it('ignores old cached demo identities and posts when signed out', async () => {
+  localStorage.setItem('mikesta_current_user_v2', JSON.stringify(CURRENT_DEMO_USER));
+  localStorage.setItem('mikesta_posts_v2', JSON.stringify(SEED_POSTS));
+  mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+  state = new MikestaStore(); await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('signedOut'); expect(state.getCurrentUser()).toBeNull(); expect(state.getPosts()).toEqual([]);
+  expect(mocks.from).not.toHaveBeenCalled();
+});
+it('hydrates real account interactions and comments from Supabase', async () => {
+  const id = SEED_POSTS[0].id;
+  rows.likes = [{ post_id: id, user_id: CURRENT_DEMO_USER.id }]; rows.saved_posts = [{ post_id: id }];
+  rows.comments = [{ id: 41, post_id: id, body: 'Persisted', created_at: 'now', profiles: { username: CURRENT_DEMO_USER.username } }];
+  await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('signedIn'); expect(state.getPosts()[0]).toMatchObject({ liked: true, saved: true, likes: 1, comments: 1 });
+  expect(state.getComments(id)[0].id).toBe(41); expect(state.getStories()).toEqual([]);
+});
+it('accepts an empty remote feed instead of resurrecting local fixtures', async () => {
+  await state.syncWithSupabase(); rows.posts = []; await state.syncWithSupabase(); expect(state.getPosts()).toEqual([]);
+});
+it('clears account data and reports a failed remote read', async () => {
+  await state.syncWithSupabase(); readError = { message: 'Access denied' }; await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('error'); expect(state.getSyncError()).toBe('Access denied'); expect(state.getPosts()).toEqual([]);
+});
+it('failed mutations leave likes, saves, and follows unchanged', async () => {
+  await state.syncWithSupabase(); writeError = { message: 'Write denied' };
+  await expect(state.toggleLike(SEED_POSTS[0].id)).rejects.toEqual(writeError);
+  await expect(state.toggleSave(SEED_POSTS[0].id)).rejects.toEqual(writeError);
+  await expect(state.toggleFollow('creator')).rejects.toEqual(writeError);
+  expect(state.getPosts()[0].liked).toBe(false); expect(state.getSavedPosts()).toEqual([]); expect(state.isFollowing('creator')).toBe(false);
+});
+it('uses the database comment id and rejects invalid comments before writing', async () => {
+  await state.syncWithSupabase(); const comment = await state.addComment(SEED_POSTS[0].id, 'Hello');
+  expect(comment.id).toBe(99);
+  mocks.from.mockClear(); await expect(state.addComment(SEED_POSTS[0].id, ' ')).rejects.toThrow('empty');
+  await expect(state.addComment(SEED_POSTS[0].id, 'x'.repeat(181))).rejects.toThrow('180'); expect(mocks.from).not.toHaveBeenCalled();
+});
+it('does not publish locally if the image upload or database insert fails', async () => {
+  await state.syncWithSupabase(); const before = state.getPosts().length;
+  mocks.upload.mockResolvedValue({ error: { message: 'Storage unavailable' } });
+  await expect(state.createPost({ file: new File(['photo'], 'photo.jpg'), caption: 'Photo' })).rejects.toEqual({ message: 'Storage unavailable' });
+  writeError = { message: 'Insert failed' };
+  await expect(state.createPost({ imageUrl: 'https://example.com/photo.jpg', caption: 'Photo' })).rejects.toEqual(writeError);
+  expect(state.getPosts()).toHaveLength(before);
+});
+it('signout clears account state and prevents unauthenticated writes', async () => {
+  await state.syncWithSupabase(); await state.signOut();
+  expect(state.getPosts()).toEqual([]); expect(state.getCurrentUser()).toBeNull();
+  await expect(state.toggleSave('post')).rejects.toThrow('sign in');
+});
+it('a late sync cannot restore account data after a signout event', async () => {
+  const stop = state.startAuth();
+  let resolve: any; mocks.getSession.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+  const pending = state.syncWithSupabase(); eventCallback('SIGNED_OUT');
+  resolve({ data: { session: { user: CURRENT_DEMO_USER } }, error: null }); await pending;
+  expect(state.getAuthStatus()).toBe('signedOut'); expect(state.getPosts()).toEqual([]); stop();
 });

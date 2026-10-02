@@ -1,281 +1,136 @@
-import {
-  Comment,
-  FeedPost,
-  UserProfile,
-  supabase,
-} from './supabase';
-import {
-  CURRENT_DEMO_USER,
-  NotificationItem,
-  SEED_COMMENTS,
-  SEED_NOTIFICATIONS,
-  SEED_POSTS,
-  SEED_PROFILES,
-  SEED_STORIES,
-  SEED_SUGGESTIONS,
-  Story,
-  SuggestedUser,
-} from './mockData';
-import { compressImage } from './imageUtils';
-
-const STORAGE_KEYS = {
-  POSTS: 'mikesta_posts_v2',
-  COMMENTS: 'mikesta_comments_v2',
-  SAVED_POST_IDS: 'mikesta_saved_post_ids_v2',
-  CURRENT_USER: 'mikesta_current_user_v2',
-  STORIES: 'mikesta_stories_v2',
-  NOTIFICATIONS: 'mikesta_notifications_v2',
-  SUGGESTIONS: 'mikesta_suggestions_v2',
-  FOLLOWING_IDS: 'mikesta_following_ids_v2',
-  INTERACTIONS_BY_USER: 'mikesta_interactions_by_user_v1',
-  THEME: 'mikesta_theme_v2',
-};
-
-type UserInteractionState = {
-  likedPostIds: string[];
-  savedPostIds: string[];
-  followingUserIds: string[];
-};
-
-function cloneSeedData<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function getStored<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn(`Failed reading ${key} from storage:`, err);
-    return fallback;
-  }
-}
-
-function setStored<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (err: any) {
-    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
-      console.warn(`Storage quota exceeded for ${key}, trimming oldest local cache...`);
-      try {
-        if (Array.isArray(value) && value.length > 8) {
-          const trimmed = value.slice(0, 8);
-          localStorage.setItem(key, JSON.stringify(trimmed));
-        }
-      } catch {}
-    } else {
-      console.warn(`Failed saving ${key} to storage:`, err);
-    }
-  }
-}
+import { Comment, FeedPost, UserProfile, supabase } from './supabase';
+import type { NotificationItem, Story, SuggestedUser } from './socialTypes';
 
 export type FeedFilter = 'following' | 'foryou' | 'recent';
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'error';
+export const errorMessage = (error: unknown) => error && typeof error === 'object' && 'message' in error
+  ? String(error.message) : 'Could not reach Supabase. Please try again.';
 
 export class MikestaStore {
-  // State
   private posts: FeedPost[] = [];
+  private profiles: UserProfile[] = [];
   private comments: Record<string, Comment[]> = {};
-  private savedPostIds: Set<string> = new Set();
+  private savedPostIds = new Set<string>();
+  private followingUserIds = new Set<string>();
+  private likers: Record<string, string[]> = {};
   private currentUser: UserProfile | null = null;
-  private isSupabaseUser = false;
   private stories: Story[] = [];
   private notifications: NotificationItem[] = [];
   private suggestions: SuggestedUser[] = [];
-  private followingUserIds: Set<string> = new Set();
-  private interactionsByUser: Record<string, UserInteractionState> = {};
   private theme: 'light' | 'dark' = 'light';
-  private isOnline = true;
-  private listeners: Set<() => void> = new Set();
+  private isOnline = typeof navigator === 'undefined' || navigator.onLine;
+  private listeners = new Set<() => void>();
+  private authStatus: AuthStatus = 'loading';
+  private syncError = '';
+  private generation = 0;
 
   constructor() {
-    this.init();
+    try { this.theme = localStorage.getItem('mikesta_theme_v2') === '"dark"' ? 'dark' : 'light'; } catch {}
+    if (typeof document !== 'undefined') document.documentElement.setAttribute('data-theme', this.theme);
   }
 
-  private init() {
-    this.posts = getStored<FeedPost[]>(STORAGE_KEYS.POSTS, cloneSeedData(SEED_POSTS));
-    this.comments = getStored<Record<string, Comment[]>>(STORAGE_KEYS.COMMENTS, cloneSeedData(SEED_COMMENTS));
-    const savedIds = getStored<string[]>(STORAGE_KEYS.SAVED_POST_IDS, [
-      '10000000-0000-0000-0000-000000000003',
-      '10000000-0000-0000-0000-000000000005',
-    ]);
-    this.savedPostIds = new Set(savedIds);
-    this.currentUser = getStored<UserProfile>(STORAGE_KEYS.CURRENT_USER, CURRENT_DEMO_USER);
-    this.stories = getStored<Story[]>(STORAGE_KEYS.STORIES, cloneSeedData(SEED_STORIES));
-    this.notifications = getStored<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, cloneSeedData(SEED_NOTIFICATIONS));
-    this.suggestions = getStored<SuggestedUser[]>(STORAGE_KEYS.SUGGESTIONS, cloneSeedData(SEED_SUGGESTIONS));
+  public subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  private notify() { this.listeners.forEach((listener) => listener()); }
+  private clearData() {
+    this.posts = []; this.profiles = []; this.comments = {}; this.suggestions = [];
+    this.savedPostIds.clear(); this.followingUserIds.clear(); this.currentUser = null;
+    this.stories = []; this.notifications = []; this.likers = {}; this.follows = [];
+  }
+  public getAuthStatus() { return this.authStatus; }
+  public getSyncError() { return this.syncError; }
 
-    const followingIds = getStored<string[]>(
-      STORAGE_KEYS.FOLLOWING_IDS,
-      this.suggestions.filter((s) => s.following).map((s) => s.id)
-    );
-    this.followingUserIds = new Set(followingIds);
-    this.interactionsByUser = getStored<Record<string, UserInteractionState>>(
-      STORAGE_KEYS.INTERACTIONS_BY_USER,
-      {}
-    );
-    if (this.currentUser) {
-      const storedInteractions = this.interactionsByUser[this.currentUser.id];
-      if (storedInteractions) {
-        this.restoreInteractionState(storedInteractions);
+  public startAuth() {
+    let active = true;
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return;
+      if (event === 'SIGNED_OUT') {
+        this.generation++; this.clearData(); this.authStatus = 'signedOut'; this.syncError = ''; this.notify();
       } else {
-        this.captureInteractionState();
+        // Supabase auth callbacks must not await another auth request.
+        queueMicrotask(() => { if (active) void this.syncWithSupabase(); });
       }
-    }
-
-    this.theme = getStored<'light' | 'dark'>(STORAGE_KEYS.THEME, 'light');
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', this.theme);
-    }
-
-    if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
-      this.isOnline = navigator.onLine;
-      window.addEventListener('online', () => {
-        this.isOnline = true;
-        this.notify();
-      });
-      window.addEventListener('offline', () => {
-        this.isOnline = false;
-        this.notify();
-      });
-    }
-
-    this.syncPostFlags();
-  }
-
-  private syncPostFlags() {
-    this.posts = this.posts.map((p) => ({
-      ...p,
-      saved: this.savedPostIds.has(p.id),
-    }));
-  }
-
-  public subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
-  private notify() {
-    this.syncPostFlags();
-    this.persist();
-    for (const listener of this.listeners) {
-      listener();
-    }
-  }
-
-  private persist() {
-    this.captureInteractionState();
-    setStored(STORAGE_KEYS.POSTS, this.posts);
-    setStored(STORAGE_KEYS.COMMENTS, this.comments);
-    setStored(STORAGE_KEYS.SAVED_POST_IDS, Array.from(this.savedPostIds));
-    setStored(STORAGE_KEYS.CURRENT_USER, this.currentUser);
-    setStored(STORAGE_KEYS.STORIES, this.stories);
-    setStored(STORAGE_KEYS.NOTIFICATIONS, this.notifications);
-    setStored(STORAGE_KEYS.SUGGESTIONS, this.suggestions);
-    setStored(STORAGE_KEYS.FOLLOWING_IDS, Array.from(this.followingUserIds));
-    setStored(STORAGE_KEYS.INTERACTIONS_BY_USER, this.interactionsByUser);
-    setStored(STORAGE_KEYS.THEME, this.theme);
-  }
-
-  private captureInteractionState() {
-    if (!this.currentUser) return;
-    this.interactionsByUser[this.currentUser.id] = {
-      likedPostIds: this.posts.filter((post) => post.liked).map((post) => post.id),
-      savedPostIds: Array.from(this.savedPostIds),
-      followingUserIds: Array.from(this.followingUserIds),
+    });
+    void this.syncWithSupabase();
+    const online = () => { this.isOnline = true; this.notify(); void this.syncWithSupabase(); };
+    const offline = () => { this.isOnline = false; this.notify(); };
+    window.addEventListener('online', online); window.addEventListener('offline', offline);
+    return () => {
+      active = false; data.subscription.unsubscribe(); this.generation++;
+      window.removeEventListener('online', online); window.removeEventListener('offline', offline);
     };
   }
 
-  private restoreInteractionState(state: UserInteractionState) {
-    const likedPostIds = new Set(state.likedPostIds);
-    this.savedPostIds = new Set(state.savedPostIds);
-    this.followingUserIds = new Set(state.followingUserIds);
-    this.posts = this.posts.map((post) => ({ ...post, liked: likedPostIds.has(post.id) }));
-    this.suggestions = this.suggestions.map((suggestion) => ({
-      ...suggestion,
-      following: this.followingUserIds.has(suggestion.id),
-    }));
-  }
-
   public async syncWithSupabase(): Promise<void> {
+    const generation = ++this.generation;
+    this.authStatus = 'loading'; this.syncError = ''; this.notify();
     try {
-      const { data: supaUser } = await supabase.auth.getUser();
-      if (supaUser?.user) {
-        this.isSupabaseUser = true;
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', supaUser.user.id)
-          .maybeSingle();
-
-        if (prof) {
-          this.currentUser = prof as UserProfile;
-        } else {
-          const username =
-            supaUser.user.user_metadata?.username ||
-            supaUser.user.email?.split('@')[0] ||
-            `user_${supaUser.user.id.slice(0, 6)}`;
-          const fallbackProf: UserProfile = {
-            id: supaUser.user.id,
-            username,
-            display_name: username,
-            bio: 'Creator on Mikesta.',
-            avatar_url: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80`,
-          };
-          this.currentUser = fallbackProf;
+      const session = await supabase.auth.getSession();
+      if (session.error) throw session.error;
+      if (!session.data.session) {
+        if (generation !== this.generation) return;
+        const callback = new URLSearchParams(window.location.hash.slice(1));
+        if (callback.has('error') || callback.has('error_code')) {
+          // Consume a failed callback once; retrying must not reuse its URL error.
+          window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+          throw new Error(callback.get('error_code') === 'otp_expired'
+            ? 'This confirmation link is invalid, expired, or already used. Try signing in, or request a new confirmation email below.'
+            : callback.get('error_description') || 'Email confirmation failed. Request a new confirmation email below.');
         }
-
-        this.restoreInteractionState(
-          this.interactionsByUser[this.currentUser.id] || {
-            likedPostIds: [],
-            savedPostIds: [],
-            followingUserIds: [],
-          }
-        );
+        this.clearData(); this.authStatus = 'signedOut'; this.notify(); return;
       }
-
-      const { data: supaPosts, error: postErr } = await supabase
-        .from('posts')
-        .select('id, user_id, image_url, caption, location, created_at, profiles(username, display_name, avatar_url)')
-        .order('created_at', { ascending: false });
-
-      if (!postErr && supaPosts && supaPosts.length > 0) {
-        const formatted: FeedPost[] = await Promise.all(
-          supaPosts.map(async (row: any) => {
-            const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-            const [likesRes, commentRes] = await Promise.all([
-              supabase.from('likes').select('post_id', { count: 'exact', head: true }).eq('post_id', row.id),
-              supabase.from('comments').select('id', { count: 'exact', head: true }).eq('post_id', row.id),
-            ]);
-
-            return {
-              id: row.id,
-              user_id: row.user_id,
-              image_url: row.image_url,
-              caption: row.caption,
-              location: row.location,
-              created_at: row.created_at,
-              profiles: prof,
-              likes: likesRes.count || 0,
-              comments: commentRes.count || 0,
-              liked: this.currentUser
-                ? this.interactionsByUser[this.currentUser.id]?.likedPostIds.includes(row.id) || false
-                : false,
-              saved: this.savedPostIds.has(row.id),
-            };
-          })
-        );
-
-        const supaIds = new Set(formatted.map((p) => p.id));
-        const combined = [...formatted, ...this.posts.filter((p) => !supaIds.has(p.id))];
-        this.posts = combined;
-        this.notify();
+      const authentication = await supabase.auth.getUser();
+      if (authentication.error) throw authentication.error;
+      const user = authentication.data.user;
+      if (!user) throw new Error('Please sign in again.');
+      const results = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase.from('posts').select('id,user_id,image_url,caption,location,created_at,profiles(username,display_name,avatar_url)').order('created_at', { ascending: false }),
+        supabase.from('likes').select('post_id,user_id'),
+        supabase.from('comments').select('id,post_id,body,created_at,profiles(username)').order('created_at'),
+        supabase.from('saved_posts').select('post_id').eq('user_id', user.id),
+        supabase.from('follows').select('follower_id,following_id'),
+      ]);
+      for (const result of results) if (result.error) throw result.error;
+      if (generation !== this.generation) return;
+      const [profiles, posts, likes, comments, saved, follows] = results.map((result) => result.data || []);
+      const profile = profiles.find((row: any) => row.id === user.id);
+      if (!profile) throw new Error('Your account profile is missing. Please contact support.');
+      this.clearData(); this.profiles = profiles as UserProfile[]; this.currentUser = profile as UserProfile;
+      this.savedPostIds = new Set(saved.map((row: any) => row.post_id));
+      this.followingUserIds = new Set(follows.filter((row: any) => row.follower_id === user.id).map((row: any) => row.following_id));
+      for (const row of comments as any[]) {
+        const author = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+        (this.comments[row.post_id] ||= []).push({ id: row.id, body: row.body, created_at: row.created_at, profiles: author });
       }
-    } catch (err) {
-      console.warn('Supabase sync skipped / offline fallback active:', err);
+      for (const like of likes as any[]) (this.likers[like.post_id] ||= []).push(like.user_id);
+      this.posts = (posts as any[]).map((row) => ({ ...row,
+        profiles: Array.isArray(row.profiles) ? row.profiles[0] : row.profiles,
+        likes: likes.filter((like: any) => like.post_id === row.id).length,
+        comments: (this.comments[row.id] || []).length,
+        liked: likes.some((like: any) => like.post_id === row.id && like.user_id === user.id),
+        saved: this.savedPostIds.has(row.id),
+      }));
+      this.suggestions = this.profiles.filter((profile) => profile.id !== user.id).map((profile) => ({
+        id: profile.id, username: profile.username, display_name: profile.display_name || profile.username,
+        avatar_url: profile.avatar_url || '', reason: 'Creator on Mikesta', following: this.followingUserIds.has(profile.id),
+      }));
+      this.follows = follows as { follower_id: string; following_id: string }[];
+      this.authStatus = 'signedIn'; this.notify();
+    } catch (error) {
+      if (generation !== this.generation) return;
+      this.clearData(); this.authStatus = 'error'; this.syncError = errorMessage(error); this.notify();
     }
   }
-
+  private follows: { follower_id: string; following_id: string }[] = [];
+  public getFollowerCount(id: string) { return this.follows.filter((row) => row.following_id === id).length; }
+  public getFollowingCount(id: string) { return this.follows.filter((row) => row.follower_id === id).length; }
+  public getLikedProfiles(id: string) { return this.profiles.filter((profile) => (this.likers[id] || []).includes(profile.id)); }
+  private requireUser() {
+    if (!this.currentUser || this.authStatus !== 'signedIn') throw new Error('Please sign in to continue.');
+    return this.currentUser;
+  }
+  private check(result: { error: unknown }) { if (result.error) throw result.error; }
+  public async signOut() { const result = await supabase.auth.signOut(); this.check(result); this.generation++; this.clearData(); this.authStatus = 'signedOut'; this.notify(); }
   // Getters
   public getPosts(): FeedPost[] {
     return this.posts;
@@ -322,8 +177,8 @@ export class MikestaStore {
     if (this.currentUser && this.currentUser.username.toLowerCase() === username.toLowerCase()) {
       return this.currentUser;
     }
-    const seed = SEED_PROFILES.find((p) => p.username.toLowerCase() === username.toLowerCase());
-    if (seed) return seed;
+    const profile = this.profiles.find((p) => p.username.toLowerCase() === username.toLowerCase());
+    if (profile) return profile;
 
     const postWithProf = this.posts.find(
       (p) => p.profiles?.username?.toLowerCase() === username.toLowerCase()
@@ -375,7 +230,7 @@ export class MikestaStore {
   }
 
   public getAvailableProfiles(): UserProfile[] {
-    return SEED_PROFILES;
+    return this.profiles;
   }
 
   public getTheme(): 'light' | 'dark' {
@@ -386,364 +241,90 @@ export class MikestaStore {
     return this.isOnline;
   }
 
-  private canSyncWithSupabase(): boolean {
-    return this.isSupabaseUser;
-  }
-
-  // Mutations
   public toggleTheme(): 'light' | 'dark' {
     this.theme = this.theme === 'light' ? 'dark' : 'light';
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', this.theme);
-    }
-    this.notify();
-    return this.theme;
+    document.documentElement.setAttribute('data-theme', this.theme);
+    try { localStorage.setItem('mikesta_theme_v2', JSON.stringify(this.theme)); } catch {}
+    this.notify(); return this.theme;
   }
-
-  public switchUser(user: UserProfile, isRemoteUser = false) {
-    this.captureInteractionState();
-    this.isSupabaseUser = isRemoteUser;
-    this.currentUser = user;
-    this.restoreInteractionState(
-      this.interactionsByUser[user.id] || {
-        likedPostIds: [],
-        savedPostIds: [],
-        followingUserIds: [],
-      }
-    );
-    this.notify();
+  private async upload(file: File) {
+    const user = this.requireUser();
+    const path = `${user.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+    this.check(await supabase.storage.from('posts').upload(path, file, { contentType: file.type }));
+    return supabase.storage.from('posts').getPublicUrl(path).data.publicUrl;
   }
-
-  public async updateProfile(updates: Partial<UserProfile>, avatarFile?: File | null): Promise<UserProfile> {
-    if (!this.currentUser) throw new Error('No user signed in');
-
-    if (avatarFile) {
-      if (this.canSyncWithSupabase()) {
-        const path = `${this.currentUser.id}/${crypto.randomUUID()}-${avatarFile.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
-        const upload = await supabase.storage.from('posts').upload(path, avatarFile, {
-          contentType: avatarFile.type,
-          upsert: true,
-        });
-        if (upload.error) throw upload.error;
-        const { data } = supabase.storage.from('posts').getPublicUrl(path);
-        updates = { ...updates, avatar_url: data.publicUrl };
-      } else {
-        updates = { ...updates, avatar_url: await compressImage(avatarFile, 512, 512, 0.86) };
-      }
-    }
-
-    const updated: UserProfile = {
-      ...this.currentUser,
-      ...updates,
-    };
-    if (this.canSyncWithSupabase()) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          username: updated.username,
-          display_name: updated.display_name,
-          bio: updated.bio,
-          avatar_url: updated.avatar_url,
-        })
-        .eq('id', updated.id);
-      if (error) throw error;
-    }
-
-    this.currentUser = updated;
-
-    this.posts = this.posts.map((p) => {
-      if (p.user_id === updated.id) {
-        return {
-          ...p,
-          profiles: {
-            username: updated.username,
-            display_name: updated.display_name,
-            avatar_url: updated.avatar_url,
-          },
-        };
-      }
-      return p;
-    });
-
-    this.notify();
-    return updated;
+  public async updateProfile(updates: Partial<UserProfile>, file?: File | null): Promise<UserProfile> {
+    const user = this.requireUser();
+    if (file) updates = { ...updates, avatar_url: await this.upload(file) };
+    const { data, error } = await supabase.from('profiles').update({
+      username: updates.username ?? user.username, display_name: updates.display_name ?? user.display_name,
+      bio: updates.bio ?? user.bio, avatar_url: updates.avatar_url ?? user.avatar_url,
+    }).eq('id', user.id).select().single();
+    if (error) throw error;
+    this.currentUser = data;
+    this.profiles = this.profiles.map((p) => p.id === user.id ? data : p);
+    this.posts = this.posts.map((p) => p.user_id === user.id ? { ...p, profiles: data } : p);
+    this.notify(); return data;
   }
-
-  public toggleLike(postId: string): boolean {
-    let nowLiked = false;
-    this.posts = this.posts.map((p) => {
-      if (p.id === postId) {
-        nowLiked = !p.liked;
-        return {
-          ...p,
-          liked: nowLiked,
-          likes: p.likes + (nowLiked ? 1 : -1),
-        };
-      }
-      return p;
-    });
-
-    if (this.currentUser && this.canSyncWithSupabase()) {
-      const q = supabase.from('likes');
-      if (nowLiked) {
-        q.insert({ user_id: this.currentUser.id, post_id: postId }).then();
-      } else {
-        q.delete().eq('user_id', this.currentUser.id).eq('post_id', postId).then();
-      }
-    }
-
-    this.notify();
-    return nowLiked;
+  public async toggleLike(id: string): Promise<boolean> {
+    const user = this.requireUser(); const post = this.posts.find((p) => p.id === id);
+    if (!post) throw new Error('Post no longer exists.');
+    const liked = !post.liked;
+    this.check(await (liked ? supabase.from('likes').insert({ user_id: user.id, post_id: id })
+      : supabase.from('likes').delete().eq('user_id', user.id).eq('post_id', id)));
+    this.likers[id] = liked ? [...(this.likers[id] || []), user.id] : (this.likers[id] || []).filter((uid) => uid !== user.id);
+    this.posts = this.posts.map((p) => p.id === id ? { ...p, liked, likes: Math.max(0, p.likes + (liked ? 1 : -1)) } : p);
+    this.notify(); return liked;
   }
-
-  public toggleSave(postId: string): boolean {
-    const isSaved = this.savedPostIds.has(postId);
-    if (isSaved) {
-      this.savedPostIds.delete(postId);
-    } else {
-      this.savedPostIds.add(postId);
-    }
-
-    if (this.currentUser && this.canSyncWithSupabase()) {
-      const q = supabase.from('saved_posts');
-      if (!isSaved) {
-        q.insert({ user_id: this.currentUser.id, post_id: postId }).then();
-      } else {
-        q.delete().eq('user_id', this.currentUser.id).eq('post_id', postId).then();
-      }
-    }
-
-    this.notify();
-    return !isSaved;
+  public async toggleSave(id: string): Promise<boolean> {
+    const user = this.requireUser(); const saved = !this.savedPostIds.has(id);
+    this.check(await (saved ? supabase.from('saved_posts').insert({ user_id: user.id, post_id: id })
+      : supabase.from('saved_posts').delete().eq('user_id', user.id).eq('post_id', id)));
+    if (saved) this.savedPostIds.add(id); else this.savedPostIds.delete(id);
+    this.posts = this.posts.map((p) => p.id === id ? { ...p, saved } : p);
+    this.notify(); return saved;
   }
-
-  public async addComment(postId: string, text: string): Promise<Comment> {
-    if (!this.currentUser) throw new Error('Sign in to leave a comment');
-    const trimmed = text.trim();
-    if (!trimmed) throw new Error('Comment cannot be empty');
-    if (trimmed.length > 180) throw new Error('Comment must be 180 characters or fewer');
-
-    const newComment: Comment = {
-      id: Date.now(),
-      body: trimmed,
-      created_at: new Date().toISOString(),
-      profiles: {
-        username: this.currentUser.username,
-      },
-    };
-
-    const currentList = this.comments[postId] || [];
-    this.comments[postId] = [...currentList, newComment];
-
-    this.posts = this.posts.map((p) => {
-      if (p.id === postId) {
-        return { ...p, comments: p.comments + 1 };
-      }
-      return p;
-    });
-
-    if (this.canSyncWithSupabase()) {
-      await supabase.from('comments').insert({
-        user_id: this.currentUser.id,
-        post_id: postId,
-        body: trimmed,
-      });
-    }
-
-    this.notify();
-    return newComment;
+  public async toggleFollow(id: string): Promise<boolean> {
+    const user = this.requireUser(); const following = !this.followingUserIds.has(id);
+    this.check(await (following ? supabase.from('follows').insert({ follower_id: user.id, following_id: id })
+      : supabase.from('follows').delete().eq('follower_id', user.id).eq('following_id', id)));
+    if (following) { this.followingUserIds.add(id); this.follows.push({ follower_id: user.id, following_id: id }); }
+    else { this.followingUserIds.delete(id); this.follows = this.follows.filter((row) => !(row.follower_id === user.id && row.following_id === id)); }
+    this.suggestions = this.suggestions.map((p) => p.id === id ? { ...p, following } : p);
+    this.notify(); return following;
   }
-
-  public deleteComment(postId: string, commentId: number | string): void {
-    const list = this.comments[postId] || [];
-    this.comments[postId] = list.filter((c) => c.id !== commentId);
-
-    this.posts = this.posts.map((p) => {
-      if (p.id === postId) {
-        return { ...p, comments: Math.max(0, p.comments - 1) };
-      }
-      return p;
-    });
-
-    if (this.currentUser && this.canSyncWithSupabase()) {
-      supabase.from('comments').delete().eq('id', commentId).then();
-    }
-
-    this.notify();
+  public async addComment(id: string, text: string): Promise<Comment> {
+    const user = this.requireUser(); const body = text.trim();
+    if (!body) throw new Error('Comment cannot be empty');
+    if (body.length > 180) throw new Error('Comment must be 180 characters or fewer');
+    const { data, error } = await supabase.from('comments').insert({ user_id: user.id, post_id: id, body }).select('id,body,created_at,profiles(username)').single();
+    if (error) throw error;
+    const comment = { ...data, profiles: { username: user.username } } as Comment;
+    this.comments[id] = [...(this.comments[id] || []), comment];
+    this.posts = this.posts.map((p) => p.id === id ? { ...p, comments: p.comments + 1 } : p);
+    this.notify(); return comment;
   }
-
-  public toggleFollow(userId: string): boolean {
-    const isFollow = this.followingUserIds.has(userId);
-    if (isFollow) {
-      this.followingUserIds.delete(userId);
-    } else {
-      this.followingUserIds.add(userId);
-    }
-
-    this.suggestions = this.suggestions.map((s) => {
-      if (s.id === userId) {
-        return { ...s, following: !isFollow };
-      }
-      return s;
-    });
-
-    if (this.currentUser && this.canSyncWithSupabase()) {
-      const q = supabase.from('follows');
-      if (!isFollow) {
-        q.insert({ follower_id: this.currentUser.id, following_id: userId }).then();
-      } else {
-        q.delete().eq('follower_id', this.currentUser.id).eq('following_id', userId).then();
-      }
-    }
-
-    this.notify();
-    return !isFollow;
+  public async deleteComment(id: string, commentId: number | string) {
+    const user = this.requireUser();
+    this.check(await supabase.from('comments').delete().eq('id', commentId).eq('user_id', user.id));
+    this.comments[id] = (this.comments[id] || []).filter((comment) => comment.id !== commentId);
+    this.posts = this.posts.map((p) => p.id === id ? { ...p, comments: (this.comments[id] || []).length } : p); this.notify();
   }
-
-  public async createPost(params: {
-    file?: File | null;
-    imageUrl?: string;
-    caption: string;
-    location?: string;
-    filterCss?: string;
-  }): Promise<FeedPost> {
-    if (!this.currentUser) throw new Error('Sign in to create a post');
-
-    let resolvedImageUrl = params.imageUrl || '';
-
-    if (params.file) {
-      if (!params.filterCss || params.filterCss === 'none') {
-        if (this.canSyncWithSupabase()) {
-          try {
-          const path = `${this.currentUser.id}/${crypto.randomUUID()}-${params.file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
-          const upload = await supabase.storage.from('posts').upload(path, params.file, {
-            contentType: params.file.type,
-          });
-
-          if (!upload.error) {
-            const { data: publicData } = supabase.storage.from('posts').getPublicUrl(path);
-            if (publicData?.publicUrl) {
-              resolvedImageUrl = publicData.publicUrl;
-            }
-          }
-          } catch (err) {
-            console.warn('Supabase storage upload failed, compressing locally:', err);
-          }
-        }
-      }
-
-      if (!resolvedImageUrl) {
-        try {
-          resolvedImageUrl = await compressImage(params.file, 1440, 1440, 0.84, params.filterCss);
-        } catch {
-          resolvedImageUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () =>
-              resolve('https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80');
-            reader.readAsDataURL(params.file!);
-          });
-        }
-      }
-    }
-
-    if (!resolvedImageUrl) {
-      throw new Error('Please choose an image for your post.');
-    }
-
-    const postId = crypto.randomUUID();
-    const newPost: FeedPost = {
-      id: postId,
-      user_id: this.currentUser.id,
-      image_url: resolvedImageUrl,
-      caption: params.caption.trim(),
-      location: params.location?.trim() || null,
-      created_at: new Date().toISOString(),
-      profiles: {
-        username: this.currentUser.username,
-        display_name: this.currentUser.display_name,
-        avatar_url: this.currentUser.avatar_url,
-      },
-      likes: 0,
-      comments: 0,
-      liked: false,
-      saved: false,
-    };
-
-    this.posts = [newPost, ...this.posts];
-
-    if (this.canSyncWithSupabase()) {
-      await supabase.from('posts').insert({
-        id: postId,
-        user_id: this.currentUser.id,
-        image_url: resolvedImageUrl,
-        caption: params.caption.trim(),
-        location: params.location?.trim() || null,
-      });
-    }
-
-    this.notify();
-    return newPost;
+  public async createPost(params: { file?: File | null; imageUrl?: string; caption: string; location?: string; filterCss?: string }): Promise<FeedPost> {
+    const user = this.requireUser();
+    const image_url = params.file ? await this.upload(params.file) : params.imageUrl;
+    if (!image_url || !/^https?:\/\//.test(image_url)) throw new Error('Please choose an image for your post.');
+    const { data, error } = await supabase.from('posts').insert({ user_id: user.id, image_url, caption: params.caption.trim(), location: params.location?.trim() || null }).select().single();
+    if (error) throw error;
+    const post = { ...data, profiles: user, likes: 0, comments: 0, liked: false, saved: false } as FeedPost;
+    this.posts = [post, ...this.posts]; this.notify(); return post;
   }
-
-  public deletePost(postId: string): void {
-    this.posts = this.posts.filter((p) => p.id !== postId);
-    this.savedPostIds.delete(postId);
-    delete this.comments[postId];
-
-    if (this.currentUser && this.canSyncWithSupabase()) {
-      supabase.from('posts').delete().eq('id', postId).eq('user_id', this.currentUser.id).then();
-    }
-
-    this.notify();
+  public async deletePost(id: string) {
+    const user = this.requireUser(); this.check(await supabase.from('posts').delete().eq('id', id).eq('user_id', user.id));
+    this.posts = this.posts.filter((p) => p.id !== id); this.savedPostIds.delete(id); delete this.comments[id]; this.notify();
   }
-
-  public addStory(params: { imageUrl: string; caption?: string }): Story {
-    if (!this.currentUser) throw new Error('Sign in to share a story');
-
-    const newStory: Story = {
-      id: `story_${Date.now()}`,
-      user_id: this.currentUser.id,
-      username: this.currentUser.username,
-      avatar_url:
-        this.currentUser.avatar_url ||
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-      story_image: params.imageUrl,
-      caption: params.caption,
-      created_at: 'Just now',
-      seen: false,
-    };
-
-    this.stories = [newStory, ...this.stories];
-    this.notify();
-    return newStory;
-  }
-
-  public markStorySeen(storyId: string) {
-    this.stories = this.stories.map((s) => (s.id === storyId ? { ...s, seen: true } : s));
-    this.notify();
-  }
-
-  public markAllNotificationsRead() {
-    this.notifications = this.notifications.map((n) => ({ ...n, read: true }));
-    this.notify();
-  }
-
-  public resetToSeedData() {
-    this.posts = cloneSeedData(SEED_POSTS);
-    this.comments = cloneSeedData(SEED_COMMENTS);
-    this.savedPostIds = new Set([
-      '10000000-0000-0000-0000-000000000003',
-      '10000000-0000-0000-0000-000000000005',
-    ]);
-    this.currentUser = CURRENT_DEMO_USER;
-    this.stories = cloneSeedData(SEED_STORIES);
-    this.notifications = cloneSeedData(SEED_NOTIFICATIONS);
-    this.suggestions = cloneSeedData(SEED_SUGGESTIONS);
-    this.followingUserIds = new Set(this.suggestions.filter((s) => s.following).map((s) => s.id));
-    this.interactionsByUser = {};
-    this.notify();
-  }
+  public addStory(_params: { imageUrl: string; caption?: string }): Story { throw new Error('Story publishing is not available.'); }
+  public markStorySeen(_id: string) {}
+  public markAllNotificationsRead() {}
 }
-
 export const store = new MikestaStore();

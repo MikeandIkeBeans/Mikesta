@@ -25,9 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   search,
   onSearchChange,
 }) => {
-  const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const profiles = store.getAvailableProfiles();
 
   const query = search.trim().toLowerCase();
   const matchingCreators = query
@@ -201,97 +199,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* Quick Demo Switcher toggle button */}
-            <button
-              onClick={() => setShowSwitchMenu(!showSwitchMenu)}
-              title="Switch user"
-              style={{
-                position: 'absolute',
-                bottom: -4,
-                right: -6,
-                fontSize: 9,
-                background: 'var(--ink)',
-                color: 'white',
-                borderRadius: '50%',
-                width: 14,
-                height: 14,
-                display: 'grid',
-                placeItems: 'center',
-              }}
-            >
-              <i className="fa-solid fa-repeat" />
-            </button>
-
-            {showSwitchMenu && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 38,
-                  right: 0,
-                  width: 220,
-                  background: 'var(--surface)',
-                  borderRadius: 12,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-                  border: '1px solid var(--line)',
-                  padding: 8,
-                  zIndex: 60,
-                }}
-              >
-                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, padding: '4px 8px', textTransform: 'uppercase' }}>
-                  Switch Profile
-                </div>
-                {profiles.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      store.switchUser(p);
-                      setShowSwitchMenu(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      width: '100%',
-                      padding: '6px 8px',
-                      borderRadius: 6,
-                      background: currentUser?.id === p.id ? 'var(--mint)' : 'transparent',
-                      textAlign: 'left',
-                      fontSize: 12,
-                    }}
-                  >
-                    <img
-                      src={p.avatar_url || ''}
-                      alt={p.username}
-                      style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{p.username}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>{p.display_name}</div>
-                    </div>
-                  </button>
-                ))}
-                <div style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 6 }}>
-                  <button
-                    onClick={() => {
-                      setShowSwitchMenu(false);
-                      onAuth();
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: 'var(--accent)',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <i className="fa-solid fa-arrow-right-to-bracket" style={{ marginRight: 6 }} />
-                    Supabase Sign In / Register
-                  </button>
-                </div>
-              </div>
-            )}
+            <button className="button-outline" onClick={onAuth} style={{ marginLeft: 8 }}>Sign out</button>
           </div>
         </nav>
       </div>

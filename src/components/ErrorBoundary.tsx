@@ -28,9 +28,6 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public handleReset = () => {
-    try {
-      localStorage.clear();
-    } catch {}
     window.location.href = '/';
   };
 
@@ -80,7 +77,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </h2>
 
             <p style={{ color: 'var(--muted, #73807b)', fontSize: 13, margin: '0 0 20px' }}>
-              Mikesta encountered an unexpected issue. Don't worry, your local moments are preserved.
+              Mikesta encountered an unexpected issue. Reload to try again.
             </p>
 
             {this.state.error?.message && (
@@ -129,7 +126,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   cursor: 'pointer',
                 }}
               >
-                Reset cache
+                Return home
               </button>
             </div>
           </div>

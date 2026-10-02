@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AuthDialog } from '../components/AuthDialog';
 import { EditProfileDialog } from '../components/EditProfileDialog';
-import { MikestaStore, store } from '../lib/store';
-import { CURRENT_DEMO_USER } from '../lib/mockData';
+import { store } from '../lib/store';
+import { CURRENT_DEMO_USER } from './fixtures';
 import { supabase } from '../lib/supabase';
 
 vi.mock('../lib/supabase', () => ({ supabase: { from: vi.fn(), auth: { signUp: vi.fn(), signInWithPassword: vi.fn() }, storage: { from: vi.fn() } } }));
@@ -53,29 +53,17 @@ it('shows upload failure, keeps the editor open, and permits retry', async () =>
   expect(onSave.mock.calls[1][1]).toBe(file);
 });
 
-it('rejects database save failures without replacing or persisting the local profile', async () => {
-  const store = new MikestaStore();
-  store.switchUser({ ...CURRENT_DEMO_USER }, true);
-  const original = store.getCurrentUser();
-  const beforeStorage = localStorage.getItem('mikesta_current_user_v2');
-  const error = { message: 'Username already exists', code: '23505' };
-  const eq = vi.fn().mockResolvedValue({ error });
-  vi.mocked(supabase.from).mockReturnValue({ update: vi.fn().mockReturnValue({ eq }) } as any);
-  await expect(store.updateProfile({ username: 'taken' })).rejects.toEqual(error);
-  expect(store.getCurrentUser()).toEqual(original);
-  expect(localStorage.getItem('mikesta_current_user_v2')).toBe(beforeStorage);
-});
-
-
 it('keeps a collision-safe profile provisioned by the signup trigger', async () => {
   const profile = { ...CURRENT_DEMO_USER, username: 'alex_unique' };
-  vi.mocked(supabase.auth.signUp).mockResolvedValue({ data: { session: {}, user: { id: profile.id } }, error: null } as any);
+  vi.mocked(supabase.auth.signUp).mockResolvedValue({ data: { session: {}, user: { id: profile.id, user_metadata: {} } }, error: null } as any);
   const upsert = vi.fn();
   const maybeSingle = vi.fn().mockResolvedValue({ data: profile, error: null });
   vi.mocked(supabase.from).mockReturnValue({
     select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle }) }), upsert,
   } as any);
-  const switchUser = vi.spyOn(store, 'switchUser');
+  vi.spyOn(store, 'syncWithSupabase').mockResolvedValue(undefined);
+  vi.spyOn(store, 'getCurrentUser').mockReturnValue(profile);
+  vi.spyOn(store, 'getAuthStatus').mockReturnValue('signedIn');
   const onSuccess = vi.fn();
   const { container } = render(<AuthDialog mode="signup" setMode={vi.fn()} onSuccess={onSuccess} onClose={vi.fn()} onAnnounce={vi.fn()} />);
   fireEvent.change(container.querySelector('input[name="email"]')!, { target: { value: 'alex@example.com' } });
@@ -83,6 +71,6 @@ it('keeps a collision-safe profile provisioned by the signup trigger', async () 
   fireEvent.change(container.querySelector('input[name="username"]')!, { target: { value: 'alex' } });
   fireEvent.submit(container.querySelector('form')!);
   await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(profile));
-  expect(switchUser).toHaveBeenCalledWith(profile, true);
+  expect(store.syncWithSupabase).toHaveBeenCalled();
   expect(upsert).not.toHaveBeenCalled();
 });

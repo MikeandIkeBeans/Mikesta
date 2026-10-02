@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FeedPost, UserProfile } from './lib/supabase';
-import { FeedFilter, store } from './lib/store';
-import { Story } from './lib/mockData';
+import { errorMessage, FeedFilter, store } from './lib/store';
+import { Story } from './lib/socialTypes';
 import { Header } from './components/Header';
 import { FeedPage } from './components/FeedPage';
 import { ProfilePage } from './components/ProfilePage';
@@ -97,6 +97,7 @@ export default function App() {
 
     // Global keyboard listener (Escape to close, ? for shortcuts)
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (store.getAuthStatus() !== 'signedIn') return;
       const isInput = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName);
 
       if (e.key === 'Escape') {
@@ -118,7 +119,7 @@ export default function App() {
   }, [detailPost, activeStory]);
 
   useEffect(() => {
-    store.syncWithSupabase();
+    return store.startAuth();
   }, []);
 
   // Lock body scroll when any dialog or modal is open
@@ -133,6 +134,13 @@ export default function App() {
       document.body.classList.remove('dialog-open');
     };
   }, [dialog, activeStory, detailPost]);
+
+  const authStatus = store.getAuthStatus();
+  useEffect(() => {
+    if (authStatus === 'signedOut' || authStatus === 'error') {
+      setDialog(null); setDetailPost(null); setSelectedPost(null); setActiveStory(null);
+    }
+  }, [authStatus]);
 
   const currentUser = store.getCurrentUser();
   const filteredPosts = store.getFilteredPosts(activeFilter, search);
@@ -157,16 +165,18 @@ export default function App() {
     : null;
 
   // Handlers
-  const handleReaction = (post: FeedPost, kind: 'like' | 'save') => {
+  const handleReaction = async (post: FeedPost, kind: 'like' | 'save') => {
+    try {
     if (kind === 'like') {
-      const liked = store.toggleLike(post.id);
+      const liked = await store.toggleLike(post.id);
       if (liked) {
         announce('Moment liked');
       }
     } else {
-      const saved = store.toggleSave(post.id);
+      const saved = await store.toggleSave(post.id);
       announce(saved ? 'Moment added to your saved collection' : 'Moment removed from saved');
     }
+    } catch (error) { announce(errorMessage(error), 'error'); }
   };
 
   const handleAddComment = async (postId: string, text: string) => {
@@ -178,9 +188,9 @@ export default function App() {
     }
   };
 
-  const handleDeleteComment = (postId: string, commentId: number | string) => {
-    store.deleteComment(postId, commentId);
-    announce('Comment removed');
+  const handleDeleteComment = async (postId: string, commentId: number | string) => {
+    try { await store.deleteComment(postId, commentId); announce('Comment removed'); }
+    catch (error) { announce(errorMessage(error), 'error'); }
   };
 
   const handlePublishPost = async (params: {
@@ -212,18 +222,22 @@ export default function App() {
     }
   };
 
-  const handleDeletePost = (postId: string) => {
-    store.deletePost(postId);
+  const handleDeletePost = async (postId: string) => {
+    try {
+    await store.deletePost(postId);
     if (detailPost?.id === postId) {
       setDetailPost(null);
     }
     announce('Post deleted');
     setDialog(null);
+    } catch (error) { announce(errorMessage(error), 'error'); }
   };
 
-  const handleToggleFollow = (userId: string) => {
-    const isNowFollowing = store.toggleFollow(userId);
+  const handleToggleFollow = async (userId: string) => {
+    try {
+    const isNowFollowing = await store.toggleFollow(userId);
     announce(isNowFollowing ? 'Added to your following circle' : 'Unfollowed creator');
+    } catch (error) { announce(errorMessage(error), 'error'); }
   };
 
   const handleViewLikes = (post: FeedPost) => {
@@ -266,6 +280,16 @@ export default function App() {
     commentsMap[post.id] = store.getComments(post.id);
   }
 
+  if (authStatus !== 'signedIn') {
+    return <main className="auth-screen">
+      <div className="auth-intro"><p className="kicker">Mikesta</p><h1>A place for moments worth keeping.</h1><p>Sign in or create an account to join your circle.</p></div>
+      {authStatus === 'loading' ? <p role="status">Connecting to your account…</p> : <>
+        {store.getSyncError() && <div role="alert"><p>{store.getSyncError()}</p><button className="button-outline" onClick={() => void store.syncWithSupabase()}>Retry connection</button></div>}
+        <AuthDialog embedded mode={authMode} setMode={setAuthMode} onSuccess={() => setDialog(null)} onClose={() => setDialog(null)} onAnnounce={announce} />
+      </>}
+    </main>;
+  }
+
   return (
     <>
       {/* Offline Status Notice */}
@@ -282,7 +306,7 @@ export default function App() {
           }}
         >
           <i className="fa-solid fa-wifi" style={{ marginRight: 8, opacity: 0.7 }} />
-          Offline mode active — moments and comments are saved locally and will synchronize when connection restores.
+          You are offline. Reconnect to load or save changes.
         </div>
       )}
 
@@ -292,7 +316,7 @@ export default function App() {
         navigate={navigate}
         onUpload={() => setDialog('upload')}
         onNotifications={() => setDialog('notifications')}
-        onAuth={() => setDialog('auth')}
+        onAuth={async () => { try { await store.signOut(); setDialog(null); setDetailPost(null); } catch (error) { announce(errorMessage(error), 'error'); } }}
         unreadCount={unreadCount}
         search={search}
         onSearchChange={setSearch}
@@ -310,8 +334,8 @@ export default function App() {
           onToggleFollow={handleToggleFollow}
           onDeletePost={handleDeletePost}
           onRemoveSaved={(postId) => {
-            store.toggleSave(postId);
-            announce('Moment removed from saved');
+            const post = store.getPosts().find((p) => p.id === postId);
+            if (post) void handleReaction(post, 'save');
           }}
         />
       ) : (
@@ -345,9 +369,8 @@ export default function App() {
           onViewProfile={(uname) => navigate('profile', uname)}
           onViewLikes={handleViewLikes}
           onToggleFollow={handleToggleFollow}
-          onResetSeed={() => {
-            store.resetToSeedData();
-            announce('Seed fixtures reloaded');
+          onRefresh={() => {
+            void store.syncWithSupabase();
           }}
           navigate={navigate}
         />

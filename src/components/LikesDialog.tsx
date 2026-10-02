@@ -17,7 +17,7 @@ export const LikesDialog: React.FC<LikesDialogProps> = ({
   onViewProfile,
   onToggleFollow,
 }) => {
-  const allSuggestions = store.getSuggestions();
+  const allSuggestions = store.getLikedProfiles(post.id).filter((profile) => profile.id !== currentUser?.id);
 
   // Create list of likers based on post.likes and liked state
   const likers: Array<{
@@ -46,7 +46,7 @@ export const LikesDialog: React.FC<LikesDialogProps> = ({
       likers.push({
         id: s.id,
         username: s.username,
-        display_name: s.username.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        display_name: s.display_name || s.username,
         avatar_url: s.avatar_url,
         isCurrent: false,
         following: store.isFollowing(s.id),

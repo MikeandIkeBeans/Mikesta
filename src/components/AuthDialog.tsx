@@ -1,255 +1,78 @@
-import React, { FormEvent, useState } from 'react';
+import React, { FormEvent, useRef, useState } from 'react';
 import { UserProfile, supabase } from '../lib/supabase';
-import { SEED_PROFILES } from '../lib/mockData';
-import { store } from '../lib/store';
-
+import { errorMessage, store } from '../lib/store';
 export type AuthMode = 'signin' | 'signup';
-
 interface AuthDialogProps {
-  mode: AuthMode;
-  setMode: (mode: AuthMode) => void;
-  onSuccess: (profile: UserProfile) => void;
-  onClose: () => void;
+  mode: AuthMode; setMode: (mode: AuthMode) => void;
+  onSuccess: (profile: UserProfile) => void; onClose: () => void;
   onAnnounce: (message: string, tone?: 'default' | 'error') => void;
+  embedded?: boolean;
 }
-
-export const AuthDialog: React.FC<AuthDialogProps> = ({
-  mode,
-  setMode,
-  onSuccess,
-  onClose,
-  onAnnounce,
-}) => {
+export const AuthDialog: React.FC<AuthDialogProps> = ({ mode, setMode, onSuccess, onClose, onAnnounce, embedded = false }) => {
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    setLoading(true);
-
-    const form = new FormData(e.currentTarget);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
+  const emailRedirectTo = `${window.location.origin}/`;
+  const resendConfirmation = async () => {
+    const input = formRef.current?.elements.namedItem('email') as HTMLInputElement | null;
+    if (!input?.reportValidity()) return;
+    setLoading(true); setError(''); setMessage('');
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email: input.value.trim(), options: { emailRedirectTo } });
+      if (error) throw error;
+      setMessage('Confirmation email requested. Open the newest email and use its link, then sign in here if it opens in another browser.');
+    } catch (error) { setError(errorMessage(error)); }
+    finally { setLoading(false); }
+  };
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setError(''); setMessage(''); setLoading(true);
+    const form = new FormData(event.currentTarget);
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
-    const usernameInput = String(form.get('username') || '').trim();
-
+    const username = String(form.get('username') || '').trim();
     try {
-      if (mode === 'signup') {
-        const username = usernameInput || email.split('@')[0] || `creator_${Date.now().toString().slice(-4)}`;
-        const result = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { username } },
-        });
-
-        if (result.error) {
-          throw result.error;
-        }
-
-        // Email confirmation means Supabase has created the user but not an active session yet.
-        if (!result.data.session) {
-          onAnnounce('Account created. Check your email to confirm it, then sign in.');
-          onClose();
-          return;
-        }
-
-        const userObj = result.data.user;
-        const { data: provisionedProfile, error: readError } = await supabase
-          .from('profiles').select('*').eq('id', userObj.id).maybeSingle();
-        if (readError) throw readError;
-        const profile: UserProfile = (provisionedProfile as UserProfile) || {
-          id: userObj.id,
-          username,
-          display_name: username,
-          bio: 'Creator on Mikesta.',
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        };
-        // Keep the trigger's collision-safe username and existing profile fields.
-        if (!provisionedProfile) {
-          const { error: profileError } = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
-          if (profileError) throw profileError;
-        }
-        store.switchUser(profile, true);
-        onAnnounce('Welcome to Mikesta! You are signed in.');
-        onSuccess(profile);
-        onClose();
-      } else {
-        // Sign in
-        const result = await supabase.auth.signInWithPassword({ email, password });
-        if (result.error) {
-          // If email not confirmed, provide helpful recovery
-          if (result.error.message.toLowerCase().includes('email not confirmed')) {
-            const username = email.split('@')[0];
-            const fallbackProfile: UserProfile = {
-              id: crypto.randomUUID(),
-              username,
-              display_name: username,
-              bio: 'Creator on Mikesta.',
-              avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-            };
-            store.switchUser(fallbackProfile);
-            onAnnounce('Notice: Supabase email unconfirmed. Entered demo session as this account.');
-            onSuccess(fallbackProfile);
-            onClose();
-            return;
-          }
-          throw result.error;
-        }
-
-        if (result.data.user) {
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', result.data.user.id)
-            .maybeSingle();
-
-          const currentProfile: UserProfile = (prof as UserProfile) || {
-            id: result.data.user.id,
-            username: result.data.user.user_metadata?.username || email.split('@')[0],
-            display_name: result.data.user.user_metadata?.username || email.split('@')[0],
-            bio: 'Creator on Mikesta.',
-            avatar_url: null,
-          };
-          if (!prof) {
-            const { error: profileError } = await supabase.from('profiles').upsert(currentProfile, { onConflict: 'id' });
-            if (profileError) throw profileError;
-          }
-          store.switchUser(currentProfile, true);
-          onAnnounce('You are signed in.');
-          onSuccess(currentProfile);
-          onClose();
-        }
+      const result = mode === 'signup'
+        ? await supabase.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo } })
+        : await supabase.auth.signInWithPassword({ email, password });
+      if (result.error) throw result.error;
+      if (!result.data.session) {
+        setMessage('Check your email to confirm your account, then sign in.'); setMode('signin'); return;
       }
-    } catch (err: any) {
-      setErrorMsg(err?.message || 'Authentication failed');
-    } finally {
-      setLoading(false);
-    }
+      const user = result.data.user;
+      if (!user) throw new Error('Could not confirm your account. Please sign in again.');
+      const lookup = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+      if (lookup.error) throw lookup.error;
+      if (!lookup.data) {
+        const profile = { id: user.id, username: user.user_metadata?.username || username || email.split('@')[0], display_name: user.user_metadata?.username || username || email.split('@')[0], bio: '', avatar_url: null };
+        const saved = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
+        if (saved.error) throw saved.error;
+      }
+      await store.syncWithSupabase();
+      const profile = store.getCurrentUser();
+      if (store.getAuthStatus() !== 'signedIn' || !profile) throw new Error(store.getSyncError() || 'Could not load your account. Please retry.');
+      onSuccess(profile); onAnnounce('You are signed in.'); onClose();
+    } catch (error) { setError(errorMessage(error)); }
+    finally { setLoading(false); }
   };
-
-  const handleDemoLogin = (profile: UserProfile) => {
-    store.switchUser(profile);
-    onAnnounce(`Signed in as demo creator @${profile.username}`);
-    onSuccess(profile);
-    onClose();
-  };
-
-  return (
-    <div className="app-dialog open" role="dialog" aria-modal="true">
-      <div className="app-dialog-card" style={{ maxWidth: 440 }}>
-        <div className="app-dialog-header">
-          <div>
-            <p className="kicker">Your account</p>
-            <h2>{mode === 'signup' ? 'Create your account' : 'Sign in to Mikesta'}</h2>
-          </div>
-          <button className="dialog-close" onClick={onClose} aria-label="Close">
-            <i className="fa-solid fa-xmark" />
-          </button>
-        </div>
-
-        <div className="app-dialog-body">
-          {errorMsg && (
-            <div
-              style={{
-                padding: '10px 14px',
-                borderRadius: 8,
-                background: '#fbeae8',
-                color: '#ad4938',
-                fontSize: 12,
-                marginBottom: 16,
-              }}
-            >
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Quick Demo Sign In Cards for Interview Reviewers */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>
-              ⚡ 1-Click Demo Profiles (instant access):
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {SEED_PROFILES.slice(0, 4).map((p) => (
-                <button
-                  type="button"
-                  key={p.id}
-                  onClick={() => handleDemoLogin(p)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '8px 10px',
-                    borderRadius: 8,
-                    border: '1px solid var(--line)',
-                    background: 'var(--paper)',
-                    textAlign: 'left',
-                    fontSize: 11,
-                  }}
-                >
-                  <img
-                    src={p.avatar_url || ''}
-                    alt={p.username}
-                    style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
-                  />
-                  <div>
-                    <strong style={{ display: 'block', fontSize: 11 }}>{p.username}</strong>
-                    <span style={{ fontSize: 9, color: 'var(--muted)' }}>Demo Creator</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              margin: '16px 0',
-              color: 'var(--muted)',
-              fontSize: 11,
-            }}
-          >
-            <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-            <span>or continue with Supabase</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
-          </div>
-
-          <form className="edit-form" onSubmit={handleSubmit}>
-            <label>
-              Email
-              <input name="email" type="email" placeholder="name@domain.com" required />
-            </label>
-
-            <label>
-              Password
-              <input name="password" type="password" minLength={6} placeholder="••••••••" required />
-            </label>
-
-            {mode === 'signup' && (
-              <label>
-                Username
-                <input name="username" maxLength={30} placeholder="e.g. street_lens" required />
-              </label>
-            )}
-
-            <button className="dialog-action" type="submit" disabled={loading}>
-              {loading ? 'Please wait...' : mode === 'signup' ? 'Create account' : 'Sign in'}
-            </button>
-
-            <button
-              className="button-outline"
-              type="button"
-              onClick={() => {
-                setErrorMsg(null);
-                setMode(mode === 'signup' ? 'signin' : 'signup');
-              }}
-            >
-              {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create account'}
-            </button>
-          </form>
-        </div>
+  return <div className={embedded ? 'auth-panel' : 'app-dialog open'} role={embedded ? undefined : 'dialog'} aria-modal={embedded ? undefined : true} aria-labelledby="auth-heading">
+    <div className="app-dialog-card" style={{ maxWidth: 440 }}>
+      <div className="app-dialog-header">
+        <div><p className="kicker">Your circle starts here</p><h2 id="auth-heading">{mode === 'signup' ? 'Create your account' : 'Sign in to Mikesta'}</h2></div>
+        {!embedded && <button className="dialog-close" onClick={onClose} aria-label="Close">×</button>}
+      </div>
+      <div className="app-dialog-body">
+        {error && <p role="alert" style={{ color: '#ad4938' }}>{error}</p>}
+        {message && <p role="status">{message}</p>}
+        <form ref={formRef} className="edit-form" onSubmit={submit}>
+          <label>Email<input name="email" type="email" autoComplete="email" required disabled={loading} /></label>
+          <label>Password<input name="password" type="password" minLength={6} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} required disabled={loading} /></label>
+          {mode === 'signup' && <label>Username<input name="username" maxLength={30} pattern="[a-zA-Z0-9_.]+" autoComplete="username" required disabled={loading} /></label>}
+          <button className="dialog-action" type="submit" disabled={loading}>{loading ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
+          <button className="button-outline" type="button" disabled={loading} onClick={() => { setError(''); setMessage(''); setMode(mode === 'signup' ? 'signin' : 'signup'); }}>{mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create account'}</button>
+          {mode === 'signin' && <button className="button-outline" type="button" disabled={loading} onClick={resendConfirmation}>Resend confirmation email</button>}
+        </form>
       </div>
     </div>
-  );
+  </div>;
 };

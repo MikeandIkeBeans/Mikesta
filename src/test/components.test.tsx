@@ -8,7 +8,7 @@ import { PostDetailModal } from '../components/PostDetailModal';
 import { LikesDialog } from '../components/LikesDialog';
 import { StoryViewer } from '../components/StoryViewer';
 import { FeedPost } from '../lib/supabase';
-import { CURRENT_DEMO_USER } from '../lib/mockData';
+import { CURRENT_DEMO_USER } from './fixtures';
 
 const mockPost: FeedPost = {
   id: 'test-post-1',

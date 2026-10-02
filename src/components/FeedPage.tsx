@@ -1,7 +1,7 @@
 import React from 'react';
 import { Comment, FeedPost, UserProfile } from '../lib/supabase';
 import { FeedFilter } from '../lib/store';
-import { Story, SuggestedUser } from '../lib/mockData';
+import { Story, SuggestedUser } from '../lib/socialTypes';
 import { PostCard } from './PostCard';
 
 interface FeedPageProps {
@@ -28,7 +28,7 @@ interface FeedPageProps {
   onViewProfile?: (username: string) => void;
   onViewLikes?: (post: FeedPost) => void;
   onToggleFollow: (userId: string) => void;
-  onResetSeed: () => void;
+  onRefresh: () => void;
   navigate: (route: 'feed' | 'profile') => void;
 }
 
@@ -66,7 +66,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
   onViewProfile,
   onViewLikes,
   onToggleFollow,
-  onResetSeed,
+  onRefresh,
   navigate,
 }) => {
   return (
@@ -137,7 +137,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
         </section>
 
         {/* Stories Rail */}
-        <section className="stories-section" aria-label="Stories">
+        {stories.length > 0 && <section className="stories-section" aria-label="Stories">
           <div className="stories-heading">
             <span>Stories</span>
             <button onClick={onShareStory}>
@@ -189,7 +189,7 @@ export const FeedPage: React.FC<FeedPageProps> = ({
               </button>
             ))}
           </div>
-        </section>
+        </section>}
 
         {/* Topic / Hashtag Exploration Pills */}
         <div
@@ -308,8 +308,8 @@ export const FeedPage: React.FC<FeedPageProps> = ({
                     Explore "For you"
                   </button>
                 ) : (
-                  <button className="button-outline" onClick={onResetSeed}>
-                    Load Seed Data
+                  <button className="button-outline" onClick={onRefresh}>
+                    Refresh feed
                   </button>
                 )}
               </div>
@@ -381,37 +381,10 @@ export const FeedPage: React.FC<FeedPageProps> = ({
           ))}
         </div>
 
-        {/* Quick Seeder & Interview Tool */}
-        <div style={{ margin: '20px 0', padding: '14px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--line)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink)' }}>
-              <i className="fa-solid fa-database" style={{ marginRight: 6, color: 'var(--accent)' }} />
-              Database Status
-            </span>
-            <span style={{ fontSize: 9, fontFamily: 'monospace', background: 'var(--mint)', padding: '2px 6px', borderRadius: 4 }}>
-              Active
-            </span>
-          </div>
-          <p style={{ fontSize: 11, color: 'var(--muted)', margin: '0 0 10px' }}>
-            Populated with curated photography, creators, and comments.
-          </p>
-          <button
-            onClick={onResetSeed}
-            style={{
-              width: '100%',
-              padding: '6px 10px',
-              fontSize: 10,
-              fontWeight: 700,
-              borderRadius: 6,
-              border: '1px solid var(--line)',
-              background: 'var(--paper)',
-              color: 'var(--ink)',
-            }}
-          >
-            <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />
-            Reset to Seed Data
-          </button>
-        </div>
+        <button className="button-outline" onClick={onRefresh} style={{ margin: '20px 0', width: '100%' }}>
+          <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />
+          Refresh feed
+        </button>
 
         <div className="sidebar-note">
           <span className="note-mark">“</span>

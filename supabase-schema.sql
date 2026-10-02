@@ -113,6 +113,23 @@ from auth.users u
 left join public.profiles p on p.id = u.id
 where p.id is null;
 
+-- PostgREST needs a direct foreign key to embed comment author profiles.
+-- Keep the auth.users relationship and support upgrading existing databases.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.comments'::regclass
+      and conname = 'comments_author_profile_fkey'
+  ) then
+    alter table public.comments
+      add constraint comments_author_profile_fkey
+      foreign key (user_id) references public.profiles(id) on delete cascade;
+  end if;
+end;
+$$;
+notify pgrst, 'reload schema';
+
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
 alter table public.likes enable row level security;

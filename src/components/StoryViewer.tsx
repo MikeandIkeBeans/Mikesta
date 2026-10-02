@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Story } from '../lib/mockData';
+import { Story } from '../lib/socialTypes';
 import { audio } from '../lib/audio';
 
 interface StoryViewerProps {

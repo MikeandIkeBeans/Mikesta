@@ -19,3 +19,10 @@
 .darkroom-controls output { font-variant-numeric: tabular-nums; }
 .postcard-export { padding: 16px; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .postcard-export [role="alert"] { color: #ad4938; }
+
+.auth-screen { min-height: 100vh; display: grid; align-content: center; justify-items: center; gap: 24px; padding: 32px 20px; background: var(--paper); }
+.auth-intro { max-width: 440px; text-align: center; }
+.auth-intro h1 { font-size: clamp(28px, 5vw, 42px); line-height: 1.15; }
+.auth-intro p { color: var(--muted); }
+.auth-panel { width: 100%; max-width: 440px; }
+.auth-panel .app-dialog-card { max-height: none; width: 100%; }

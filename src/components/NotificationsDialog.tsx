@@ -1,5 +1,5 @@
 import React from 'react';
-import { NotificationItem } from '../lib/mockData';
+import { NotificationItem } from '../lib/socialTypes';
 
 interface NotificationsDialogProps {
   notifications: NotificationItem[];

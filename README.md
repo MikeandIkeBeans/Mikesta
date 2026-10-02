@@ -31,48 +31,29 @@ The React migration replaces the old static pages and service worker. If a brows
 previously installed the static app, clear that site's old service-worker/cache
 registration before evaluating this version.
 
-## Key Features & Robustness Enhancements
+## Authentication and persistence
 
-- **Resilient Data Layer & State Store (`src/lib/store.ts`)**:
-  - Automatically loads and hydrates rich seed fixtures so the application is vibrant and interactive out-of-the-box.
-  - Hybrid synchronization with Supabase: reads and writes to Supabase when authenticated, while gracefully falling back to a persistent local state store (`localStorage`) during network interruptions, unconfirmed emails, or missing storage buckets.
-  - One-click demo user switching in the navbar between multiple creator profiles (Elena Rodriguez, Marcus Chen, Maya Lin, Julian Vance).
-- **Feed & Filter System**:
-  - Interactive filter tabs: **Following** (posts from creators you follow), **For you** (engagement-ranked feed), and **Recent** (chronological order).
-  - Hashtag / Topic exploration pills: One-click chips (`All`, `#minimalism`, `#architecture`, `#coffee`, `#ceramics`, `#scandinavia`, `#light`, `#wanderlust`) that dynamically filter feed results.
-  - Interactive captions: Clicking any `#hashtag` within a post caption immediately filters the feed by that tag.
-  - Real-time search filtering across post captions, creator usernames, display names, and locations with instant match feedback and clear-search button.
-- **Post Detail / Lightbox View (`src/components/PostDetailModal.tsx`)**:
-  - Desktop two-column modal showing high-res imagery, author follow status, scrollable comment feed, inline comment composer, and real-time like toggles.
-  - Accessible from post feed expand buttons or clicking any photo in the profile grid.
-- **Stories Rail & Story Viewer (`src/components/StoryViewer.tsx`)**:
-  - Gradient ring avatars with unread/viewed indicators.
-  - Full-screen modal story viewer with an animated progress timer bar, keyboard navigation (Left/Right/Escape), click-zone navigation, and captions.
-  - "Share a story" flow with curated photography presets.
-- **Robust Post Creation Flow (`src/components/UploadDialog.tsx`)**:
-  - Drag-and-drop file upload with preview, file validation, caption input, and location tagging.
-  - Curated sample photo presets for instant testing without needing local image files.
-  - Multi-tier storage fallback: attempts Supabase storage upload, falling back to data URL encoding so post creation never fails due to missing storage buckets or authentication policies.
-  - Optimistic feed insertion and profile archive updates.
-- **Engagement & Social Interactions**:
-  - Double-click / double-tap image heart animation with optimistic like count toggling.
-  - Bookmarks & Saved collection synced to user profile.
-  - Comments panel with inline submission, author comment deletion, and count tracking.
-  - Post options menu (`...` button) for copying links, sharing, unfollowing, and deleting own posts.
-  - Share dialog with clipboard copy and native share API integration.
-  - Suggested creators sidebar with interactive **Follow / Unfollow** buttons that update profile follower counts and the Following feed in real-time.
-- **Notifications Activity Dialog (`src/components/NotificationsDialog.tsx`)**:
-  - Navbar heart icon with an unread badge indicator.
-  - Activity drawer showing likes, comments, follows, and saves with timestamps and "Mark all as read" capability.
-- **Profile Page & Profile Editor (`src/components/EditProfileDialog.tsx`)**:
-  - Profile statistics: posts, followers, following.
-  - Posts tab vs. Saved collection tab.
-  - Dedicated Edit Profile modal supporting custom display names, usernames, bios, and avatar URLs or preset avatars.
-- **Accessibility, Power-User & Offline Support**:
-  - Interactive **Keyboard Shortcuts** modal (press `?` anywhere to view keybindings: `?`, `n`, `t`, `j/k`, `l`, `c`, `s`, `Esc`).
-  - Active **Offline Detection Banner**: informs the user when internet connectivity drops and ensures moments/comments remain safely cached.
-  - Modal scroll-locking (`dialog-open`) and `Escape` key close management across all views.
-  - Responsive layouts from desktop down to mobile screen sizes.
+Every route requires a validated Supabase session. Visitors see sign-in and signup
+forms while existing sessions are checked before any account data is rendered.
+Email confirmation does not grant access until Supabase issues a real session.
+Sign out clears the in-memory account state; stale synchronization requests cannot restore it.
+
+In Supabase Authentication → URL Configuration, allow the app's return URLs
+(`http://127.0.0.1:5173/`, `http://localhost:5173/`, and the deployed app URL).
+Signup and confirmation resends explicitly return to the current app origin.
+Expired or reused confirmation links display an error with a resend option.
+Install `supabase-schema.sql` as well as any seed data: the schema includes the
+signup profile trigger and backfills profiles for existing accounts.
+
+Posts, profiles, likes, saves, comments, follows, and follower counts load from
+Supabase. Mutations update the UI only after a successful remote response. Upload
+or database failures remain visible and never create local-only posts or profiles.
+Empty remote feeds stay empty. The app ignores old demo identities and feed caches;
+only the theme preference and Supabase's own session storage remain local.
+
+Stories are hidden until a persisted implementation is available. Frontend seed
+fixtures live under `src/test/fixtures.ts` and are used only by automated tests.
+To populate an actual database, use the included SQL seed script deliberately.
 
 ---
 
@@ -128,7 +109,7 @@ Mikesta/
     ├── App.tsx                  # Main application orchestrator & dialog routing
     ├── main.tsx                 # React DOM mount point
     ├── components/
-    │   ├── AuthDialog.tsx       # Sign in / Sign up & 1-click demo user switcher
+    │   ├── AuthDialog.tsx       # Sign in / Sign up
     │   ├── EditProfileDialog.tsx# Profile details & avatar editor
     │   ├── FeedPage.tsx         # Stories rail, filter tabs, feed list & sidebar
     │   ├── Header.tsx           # Navbar, search, notifications badge, user menu
@@ -141,8 +122,8 @@ Mikesta/
     │   ├── StoryViewer.tsx      # Full-screen story modal with progress timer
     │   └── UploadDialog.tsx     # Post creation with drag-and-drop & photo presets
     └── lib/
-        ├── mockData.ts          # Seed profiles, posts, stories, suggestions
-        ├── store.ts             # Reactive data store with Supabase sync & offline fallback
+        ├── socialTypes.ts       # Social UI domain types
+        ├── store.ts             # Authenticated Supabase state store
         └── supabase.ts          # Typed Supabase client and domain definitions
 ```
 

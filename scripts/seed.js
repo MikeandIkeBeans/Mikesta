@@ -34,9 +34,7 @@ async function checkDatabase() {
       console.log('  Remote tables are currently empty or waiting for initial seed.');
       console.log('  -> To seed remote Supabase tables, run "supabase-seed.sql" in your Supabase SQL Editor:');
       console.log('     https://supabase.com/dashboard/project/rzrxljijijowmfoedwoe/sql');
-      console.log('\n✨ Local Application State:');
-      console.log('  The frontend automatically loads complete seed fixtures with high-resolution photography,');
-      console.log('  active stories, comments, and creator profiles so the app is instantly rich and usable.');
+      console.log('  Signed-in users will see an empty feed until posts are added to Supabase.');
     } else {
       console.log('\n✅ Remote database is seeded and operational.');
     }
