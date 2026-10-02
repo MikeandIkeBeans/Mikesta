@@ -2,7 +2,7 @@ import { Comment, FeedPost, UserProfile, supabase } from './supabase';
 import type { NotificationItem, Story, SuggestedUser } from './socialTypes';
 
 export type FeedFilter = 'following' | 'foryou' | 'recent';
-export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'error';
+export type AuthStatus = 'loading' | 'signedOut' | 'signedIn' | 'passwordRecovery' | 'error';
 export const errorMessage = (error: unknown) => error && typeof error === 'object' && 'message' in error
   ? String(error.message) : 'Could not reach Supabase. Please try again.';
 
@@ -23,6 +23,7 @@ export class MikestaStore {
   private authStatus: AuthStatus = 'loading';
   private syncError = '';
   private generation = 0;
+  private passwordRecovery = typeof window !== 'undefined' && window.location.pathname === '/reset-password';
 
   constructor() {
     try { this.theme = localStorage.getItem('mikesta_theme_v2') === '"dark"' ? 'dark' : 'light'; } catch {}
@@ -44,8 +45,10 @@ export class MikestaStore {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (!active) return;
       if (event === 'SIGNED_OUT') {
+        this.passwordRecovery = false;
         this.generation++; this.clearData(); this.authStatus = 'signedOut'; this.syncError = ''; this.notify();
       } else {
+        if (event === 'PASSWORD_RECOVERY') this.passwordRecovery = true;
         // Supabase auth callbacks must not await another auth request.
         queueMicrotask(() => { if (active) void this.syncWithSupabase(); });
       }
@@ -73,15 +76,20 @@ export class MikestaStore {
           // Consume a failed callback once; retrying must not reuse its URL error.
           window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
           throw new Error(callback.get('error_code') === 'otp_expired'
-            ? 'This confirmation link is invalid, expired, or already used. Try signing in, or request a new confirmation email below.'
+            ? 'This email link is invalid, expired, or already used. Try signing in, or request a new email below.'
             : callback.get('error_description') || 'Email confirmation failed. Request a new confirmation email below.');
         }
+        if (this.passwordRecovery) throw new Error('This password reset link has no active session. Use Forgot password to request a new link.');
         this.clearData(); this.authStatus = 'signedOut'; this.notify(); return;
       }
       const authentication = await supabase.auth.getUser();
       if (authentication.error) throw authentication.error;
       const user = authentication.data.user;
       if (!user) throw new Error('Please sign in again.');
+      if (this.passwordRecovery) {
+        if (generation !== this.generation) return;
+        this.clearData(); this.authStatus = 'passwordRecovery'; this.notify(); return;
+      }
       const results = await Promise.all([
         supabase.from('profiles').select('*'),
         supabase.from('posts').select('id,user_id,image_url,caption,location,created_at,profiles(username,display_name,avatar_url)').order('created_at', { ascending: false }),
@@ -130,6 +138,14 @@ export class MikestaStore {
     return this.currentUser;
   }
   private check(result: { error: unknown }) { if (result.error) throw result.error; }
+  public async resetPassword(password: string) {
+    if (this.authStatus !== 'passwordRecovery') throw new Error('Open a valid password reset link first.');
+    if (password.length < 6) throw new Error('Use at least 6 characters for your password.');
+    this.check(await supabase.auth.updateUser({ password }));
+    this.passwordRecovery = false;
+    window.history.replaceState(window.history.state, '', '/');
+    await this.syncWithSupabase();
+  }
   public async signOut() { const result = await supabase.auth.signOut(); this.check(result); this.generation++; this.clearData(); this.authStatus = 'signedOut'; this.notify(); }
   // Getters
   public getPosts(): FeedPost[] {

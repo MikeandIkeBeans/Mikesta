@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MikestaStore } from '../lib/store';
 import { CURRENT_DEMO_USER, SEED_POSTS } from './fixtures';
-const mocks = vi.hoisted(() => ({ from: vi.fn(), getSession: vi.fn(), getUser: vi.fn(), signOut: vi.fn(), onAuthStateChange: vi.fn(), upload: vi.fn() }));
+const mocks = vi.hoisted(() => ({ from: vi.fn(), getSession: vi.fn(), getUser: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), onAuthStateChange: vi.fn(), upload: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: { from: mocks.from, auth: mocks, storage: { from: () => ({ upload: mocks.upload, getPublicUrl: () => ({ data: { publicUrl: 'https://example.com/upload.jpg' } }) }) } } }));
 let writeError: any;
 let readError: any;
@@ -27,9 +27,39 @@ beforeEach(() => {
   mocks.getSession.mockResolvedValue({ data: { session: { user: CURRENT_DEMO_USER } }, error: null });
   mocks.getUser.mockResolvedValue({ data: { user: CURRENT_DEMO_USER }, error: null });
   mocks.signOut.mockResolvedValue({ error: null }); mocks.upload.mockResolvedValue({ error: null });
+  mocks.updateUser.mockResolvedValue({ error: null });
   mocks.from.mockImplementation(query);
   mocks.onAuthStateChange.mockImplementation((callback) => { eventCallback = callback; return { data: { subscription: { unsubscribe: vi.fn() } } }; });
   state = new MikestaStore();
+});
+it('requires a validated recovery session and waits for a successful password update', async () => {
+  await expect(state.resetPassword('new-password')).rejects.toThrow('valid password reset link');
+  window.history.replaceState({}, '', '/reset-password'); state = new MikestaStore();
+  await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('passwordRecovery');
+  expect(mocks.from).not.toHaveBeenCalled();
+  mocks.updateUser.mockResolvedValueOnce({ error: { message: 'Password rejected' } });
+  await expect(state.resetPassword('new-password')).rejects.toEqual({ message: 'Password rejected' });
+  expect(state.getAuthStatus()).toBe('passwordRecovery');
+  await state.resetPassword('new-password');
+  expect(mocks.updateUser).toHaveBeenCalledWith({ password: 'new-password' });
+  expect(state.getAuthStatus()).toBe('signedIn'); expect(window.location.pathname).toBe('/');
+});
+it('does not offer password updates for an unauthenticated reset URL', async () => {
+  window.history.replaceState({}, '', '/reset-password'); state = new MikestaStore();
+  mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+  await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('error');
+  await expect(state.resetPassword('new-password')).rejects.toThrow('valid password reset link');
+  expect(mocks.updateUser).not.toHaveBeenCalled();
+});
+it('recognizes a recovery callback even when Supabase redirects to the root URL', async () => {
+  const stop = state.startAuth();
+  eventCallback('PASSWORD_RECOVERY');
+  await state.syncWithSupabase();
+  expect(state.getAuthStatus()).toBe('passwordRecovery');
+  expect(state.getPosts()).toEqual([]);
+  stop();
 });
 it('shows an expired confirmation redirect instead of silently returning to sign in', async () => {
   window.history.replaceState({}, '', '/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid');

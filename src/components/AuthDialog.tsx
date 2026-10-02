@@ -14,6 +14,22 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ mode, setMode, onSuccess
   const [message, setMessage] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const emailRedirectTo = `${window.location.origin}/`;
+  const requestPasswordReset = async () => {
+    const input = formRef.current?.elements.namedItem('email') as HTMLInputElement | null;
+    if (!input?.reportValidity()) return;
+    setLoading(true); setError(''); setMessage('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(input.value.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setMessage('If an account exists for this email, you will receive a password reset link. Open the newest email to choose a new password.');
+    } catch (error) {
+      setError(errorMessage(error).includes('rate limit')
+        ? 'Supabase has reached its email limit. Wait for the quota to reset before requesting another reset email.'
+        : errorMessage(error));
+    } finally { setLoading(false); }
+  };
   const resendConfirmation = async () => {
     const input = formRef.current?.elements.namedItem('email') as HTMLInputElement | null;
     if (!input?.reportValidity()) return;
@@ -71,6 +87,7 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({ mode, setMode, onSuccess
           <button className="dialog-action" type="submit" disabled={loading}>{loading ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
           <button className="button-outline" type="button" disabled={loading} onClick={() => { setError(''); setMessage(''); setMode(mode === 'signup' ? 'signin' : 'signup'); }}>{mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create account'}</button>
           {mode === 'signin' && <button className="button-outline" type="button" disabled={loading} onClick={resendConfirmation}>Resend confirmation email</button>}
+          {mode === 'signin' && <button className="button-outline" type="button" disabled={loading} onClick={requestPasswordReset}>Forgot password?</button>}
         </form>
       </div>
     </div>

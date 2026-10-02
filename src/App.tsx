@@ -6,6 +6,7 @@ import { Header } from './components/Header';
 import { FeedPage } from './components/FeedPage';
 import { ProfilePage } from './components/ProfilePage';
 import { AuthDialog, AuthMode } from './components/AuthDialog';
+import { ResetPasswordPanel } from './components/ResetPasswordPanel';
 import { UploadDialog } from './components/UploadDialog';
 import { ShareStoryDialog } from './components/ShareStoryDialog';
 import { StoryViewer } from './components/StoryViewer';
@@ -278,6 +279,10 @@ export default function App() {
   const commentsMap: Record<string, any[]> = {};
   for (const post of filteredPosts) {
     commentsMap[post.id] = store.getComments(post.id);
+  }
+
+  if (authStatus === 'passwordRecovery') {
+    return <ResetPasswordPanel onSuccess={() => { navigate('feed'); announce('Password updated'); }} />;
   }
 
   if (authStatus !== 'signedIn') {

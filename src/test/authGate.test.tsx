@@ -2,13 +2,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App from '../App';
 import { AuthDialog } from '../components/AuthDialog';
-const controls = vi.hoisted(() => ({ status: 'signedOut', error: '', signUp: vi.fn(), signInWithPassword: vi.fn(), resend: vi.fn(), sync: vi.fn() }));
+import { ResetPasswordPanel } from '../components/ResetPasswordPanel';
+const controls = vi.hoisted(() => ({ status: 'signedOut', error: '', signUp: vi.fn(), signInWithPassword: vi.fn(), resend: vi.fn(), resetPasswordForEmail: vi.fn(), resetPassword: vi.fn(), sync: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ supabase: { auth: controls } }));
 vi.mock('../lib/store', () => ({
   errorMessage: (error: any) => error.message,
   store: {
     subscribe: () => () => {}, startAuth: () => () => {}, getAuthStatus: () => controls.status,
     getSyncError: () => controls.error, syncWithSupabase: controls.sync,
+    resetPassword: controls.resetPassword,
     getCurrentUser: () => null, getFilteredPosts: () => [], getSavedPosts: () => [], getStories: () => [],
     getNotifications: () => [], getSuggestions: () => [], getUnreadNotificationCount: () => 0,
     getIsOnline: () => true, getUserPosts: () => [], getPosts: () => [], getProfileByUsername: () => null,
@@ -24,6 +26,44 @@ it('requires sign in at the base URL and cannot be dismissed with Escape', () =>
   expect(screen.queryByText(/Demo/)).not.toBeInTheDocument();
   fireEvent.keyDown(document.body, { key: 'Escape' });
   expect(screen.getByRole('button', { name: /^Sign in$/ })).toBeInTheDocument();
+});
+it('requests password recovery without requiring the old password', async () => {
+  controls.resetPasswordForEmail.mockResolvedValue({ error: null });
+  render(<AuthDialog embedded mode="signin" setMode={vi.fn()} onSuccess={vi.fn()} onClose={vi.fn()} onAnnounce={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('password reset link');
+  expect(controls.resetPasswordForEmail).toHaveBeenCalledWith('new@example.com', { redirectTo: `${window.location.origin}/reset-password` });
+});
+it('shows the email rate limit when recovery cannot be sent', async () => {
+  controls.resetPasswordForEmail.mockResolvedValue({ error: { message: 'email rate limit exceeded' } });
+  render(<AuthDialog embedded mode="signin" setMode={vi.fn()} onSuccess={vi.fn()} onClose={vi.fn()} onAnnounce={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Wait for the quota');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+it('shows a password form instead of the feed during recovery', () => {
+  controls.status = 'passwordRecovery'; render(<App />);
+  expect(screen.getByRole('heading', { name: 'Choose a new password' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Create a post' })).not.toBeInTheDocument();
+});
+it('keeps the password form on mismatches or failed saves, then permits retry', async () => {
+  const onSuccess = vi.fn();
+  const { container } = render(<ResetPasswordPanel onSuccess={onSuccess} />);
+  fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'new-password' } });
+  fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different-password' } });
+  fireEvent.submit(container.querySelector('form')!);
+  expect(screen.getByRole('alert')).toHaveTextContent('do not match');
+  expect(controls.resetPassword).not.toHaveBeenCalled();
+  controls.resetPassword.mockRejectedValueOnce({ message: 'Session expired' }).mockResolvedValueOnce(undefined);
+  fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'new-password' } });
+  fireEvent.submit(container.querySelector('form')!);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Session expired');
+  expect(onSuccess).not.toHaveBeenCalled();
+  fireEvent.submit(container.querySelector('form')!);
+  await screen.findByRole('button', { name: 'Save password' });
+  expect(onSuccess).toHaveBeenCalled();
 });
 it('guards direct profile URLs and waits for session validation', () => {
   window.history.replaceState({}, '', '/profile/someone'); controls.status = 'loading'; render(<App />);

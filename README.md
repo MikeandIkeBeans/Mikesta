@@ -40,8 +40,11 @@ Sign out clears the in-memory account state; stale synchronization requests cann
 
 In Supabase Authentication → URL Configuration, allow the app's return URLs
 (`http://127.0.0.1:5173/`, `http://localhost:5173/`, and the deployed app URL).
+Also allow `/reset-password` on each app origin for password recovery.
 Signup and confirmation resends explicitly return to the current app origin.
 Expired or reused confirmation links display an error with a resend option.
+The sign-in screen includes Forgot password; recovery links open a new-password
+form after session validation. Reset email delivery uses Supabase's email quota.
 Install `supabase-schema.sql` as well as any seed data: the schema includes the
 signup profile trigger and backfills profiles for existing accounts.
 
