@@ -7,7 +7,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "test:db": "node scripts/test-profile-allocation.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

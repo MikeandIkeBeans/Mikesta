@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
 import { UserProfile } from '../lib/supabase';
 
 interface EditProfileDialogProps {
   profile: UserProfile | null;
-  onSave: (updates: Partial<UserProfile>) => Promise<void>;
+  onSave: (updates: Partial<UserProfile>, avatarFile?: File | null) => Promise<void>;
   onClose: () => void;
 }
 
@@ -24,20 +24,42 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
   const [username, setUsername] = useState(profile?.username || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || '');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => () => {
+    if (avatarUrl.startsWith('blob:')) URL.revokeObjectURL(avatarUrl);
+  }, [avatarUrl]);
+
+  const selectAvatarUrl = (url: string) => {
+    setAvatarFile(null);
+    setAvatarUrl(url);
+    setError('');
+  };
+
+  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    setAvatarFile(file);
+    setAvatarUrl(URL.createObjectURL(file));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) return;
     setSaving(true);
+    setError('');
     try {
       await onSave({
         display_name: displayName.trim() || username.trim(),
         username: username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, ''),
         bio: bio.trim(),
-        avatar_url: avatarUrl.trim(),
-      });
+        avatar_url: avatarUrl.startsWith('blob:') ? profile?.avatar_url || '' : avatarUrl.trim(),
+      }, avatarFile);
       onClose();
+    } catch (err) {
+      setError(err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+        ? err.message : 'Could not save your profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -57,6 +79,7 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
         </div>
 
         <form className="app-dialog-body edit-form" onSubmit={handleSubmit}>
+          {error && <p role="alert" style={{ color: '#ad4938' }}>{error}</p>}
           {/* Avatar Preview & Presets */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
             <img
@@ -80,7 +103,7 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
                     key={i}
                     src={url}
                     alt={`Preset ${i}`}
-                    onClick={() => setAvatarUrl(url)}
+                    onClick={() => selectAvatarUrl(url)}
                     style={{
                       width: 28,
                       height: 28,
@@ -92,6 +115,11 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
                   />
                 ))}
               </div>
+              <label className="button-outline" style={{ display: 'inline-flex', marginTop: 8, cursor: 'pointer', fontSize: 11 }}>
+                <i className="fa-solid fa-upload" />
+                Upload image
+                <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
+              </label>
             </div>
           </div>
 
@@ -123,7 +151,7 @@ export const EditProfileDialog: React.FC<EditProfileDialogProps> = ({
             <input
               type="url"
               value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
+              onChange={(e) => selectAvatarUrl(e.target.value)}
               placeholder="https://..."
             />
           </label>
