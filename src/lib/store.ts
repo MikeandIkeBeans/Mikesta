@@ -386,6 +386,10 @@ export class MikestaStore {
     return this.isOnline;
   }
 
+  private canSyncWithSupabase(): boolean {
+    return this.isSupabaseUser;
+  }
+
   // Mutations
   public toggleTheme(): 'light' | 'dark' {
     this.theme = this.theme === 'light' ? 'dark' : 'light';
@@ -396,8 +400,9 @@ export class MikestaStore {
     return this.theme;
   }
 
-  public switchUser(user: UserProfile) {
+  public switchUser(user: UserProfile, isRemoteUser = false) {
     this.captureInteractionState();
+    this.isSupabaseUser = isRemoteUser;
     this.currentUser = user;
     this.restoreInteractionState(
       this.interactionsByUser[user.id] || {
@@ -409,8 +414,23 @@ export class MikestaStore {
     this.notify();
   }
 
-  public async updateProfile(updates: Partial<UserProfile>): Promise<UserProfile> {
+  public async updateProfile(updates: Partial<UserProfile>, avatarFile?: File | null): Promise<UserProfile> {
     if (!this.currentUser) throw new Error('No user signed in');
+
+    if (avatarFile) {
+      if (this.canSyncWithSupabase()) {
+        const path = `${this.currentUser.id}/${crypto.randomUUID()}-${avatarFile.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+        const upload = await supabase.storage.from('posts').upload(path, avatarFile, {
+          contentType: avatarFile.type,
+          upsert: true,
+        });
+        if (upload.error) throw upload.error;
+        const { data } = supabase.storage.from('posts').getPublicUrl(path);
+        updates = { ...updates, avatar_url: data.publicUrl };
+      } else {
+        updates = { ...updates, avatar_url: await compressImage(avatarFile, 512, 512, 0.86) };
+      }
+    }
 
     const updated: UserProfile = {
       ...this.currentUser,
@@ -432,7 +452,7 @@ export class MikestaStore {
       return p;
     });
 
-    try {
+    if (this.canSyncWithSupabase()) {
       await supabase
         .from('profiles')
         .update({
@@ -442,8 +462,6 @@ export class MikestaStore {
           avatar_url: updated.avatar_url,
         })
         .eq('id', updated.id);
-    } catch (err) {
-      console.warn('Profile Supabase update skipped:', err);
     }
 
     this.notify();
@@ -464,7 +482,7 @@ export class MikestaStore {
       return p;
     });
 
-    if (this.currentUser) {
+    if (this.currentUser && this.canSyncWithSupabase()) {
       const q = supabase.from('likes');
       if (nowLiked) {
         q.insert({ user_id: this.currentUser.id, post_id: postId }).then();
@@ -485,7 +503,7 @@ export class MikestaStore {
       this.savedPostIds.add(postId);
     }
 
-    if (this.currentUser) {
+    if (this.currentUser && this.canSyncWithSupabase()) {
       const q = supabase.from('saved_posts');
       if (!isSaved) {
         q.insert({ user_id: this.currentUser.id, post_id: postId }).then();
@@ -523,14 +541,12 @@ export class MikestaStore {
       return p;
     });
 
-    try {
+    if (this.canSyncWithSupabase()) {
       await supabase.from('comments').insert({
         user_id: this.currentUser.id,
         post_id: postId,
         body: trimmed,
       });
-    } catch (err) {
-      console.warn('Comment Supabase sync skipped:', err);
     }
 
     this.notify();
@@ -548,7 +564,7 @@ export class MikestaStore {
       return p;
     });
 
-    if (this.currentUser) {
+    if (this.currentUser && this.canSyncWithSupabase()) {
       supabase.from('comments').delete().eq('id', commentId).then();
     }
 
@@ -570,7 +586,7 @@ export class MikestaStore {
       return s;
     });
 
-    if (this.currentUser) {
+    if (this.currentUser && this.canSyncWithSupabase()) {
       const q = supabase.from('follows');
       if (!isFollow) {
         q.insert({ follower_id: this.currentUser.id, following_id: userId }).then();
@@ -596,7 +612,8 @@ export class MikestaStore {
 
     if (params.file) {
       if (!params.filterCss || params.filterCss === 'none') {
-        try {
+        if (this.canSyncWithSupabase()) {
+          try {
           const path = `${this.currentUser.id}/${crypto.randomUUID()}-${params.file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
           const upload = await supabase.storage.from('posts').upload(path, params.file, {
             contentType: params.file.type,
@@ -608,8 +625,9 @@ export class MikestaStore {
               resolvedImageUrl = publicData.publicUrl;
             }
           }
-        } catch (err) {
-          console.warn('Supabase storage upload failed, compressing locally:', err);
+          } catch (err) {
+            console.warn('Supabase storage upload failed, compressing locally:', err);
+          }
         }
       }
 
@@ -653,7 +671,7 @@ export class MikestaStore {
 
     this.posts = [newPost, ...this.posts];
 
-    try {
+    if (this.canSyncWithSupabase()) {
       await supabase.from('posts').insert({
         id: postId,
         user_id: this.currentUser.id,
@@ -661,8 +679,6 @@ export class MikestaStore {
         caption: params.caption.trim(),
         location: params.location?.trim() || null,
       });
-    } catch (err) {
-      console.warn('Post Supabase sync skipped:', err);
     }
 
     this.notify();
@@ -674,7 +690,7 @@ export class MikestaStore {
     this.savedPostIds.delete(postId);
     delete this.comments[postId];
 
-    if (this.currentUser) {
+    if (this.currentUser && this.canSyncWithSupabase()) {
       supabase.from('posts').delete().eq('id', postId).eq('user_id', this.currentUser.id).then();
     }
 

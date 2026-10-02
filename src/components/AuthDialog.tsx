@@ -46,18 +46,9 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
           throw result.error;
         }
 
-        // If email confirmation is required by Supabase, inform user and allow instant demo sign-in
+        // Email confirmation means Supabase has created the user but not an active session yet.
         if (!result.data.session) {
-          const newProfile: UserProfile = {
-            id: result.data.user?.id || crypto.randomUUID(),
-            username,
-            display_name: username,
-            bio: 'Creator on Mikesta.',
-            avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-          };
-          store.switchUser(newProfile);
-          onAnnounce('Account registered! Entered demo session while email confirms.');
-          onSuccess(newProfile);
+          onAnnounce('Account created. Check your email to confirm it, then sign in.');
           onClose();
           return;
         }
@@ -70,7 +61,9 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
           bio: 'Creator on Mikesta.',
           avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
         };
-        store.switchUser(profile);
+        const { error: profileError } = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
+        if (profileError) throw profileError;
+        store.switchUser(profile, true);
         onAnnounce('Welcome to Mikesta! You are signed in.');
         onSuccess(profile);
         onClose();
@@ -111,7 +104,11 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
             bio: 'Creator on Mikesta.',
             avatar_url: null,
           };
-          store.switchUser(currentProfile);
+          if (!prof) {
+            const { error: profileError } = await supabase.from('profiles').upsert(currentProfile, { onConflict: 'id' });
+            if (profileError) throw profileError;
+          }
+          store.switchUser(currentProfile, true);
           onAnnounce('You are signed in.');
           onSuccess(currentProfile);
           onClose();
