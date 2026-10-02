@@ -54,15 +54,21 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
         }
 
         const userObj = result.data.user;
-        const profile: UserProfile = {
+        const { data: provisionedProfile, error: readError } = await supabase
+          .from('profiles').select('*').eq('id', userObj.id).maybeSingle();
+        if (readError) throw readError;
+        const profile: UserProfile = (provisionedProfile as UserProfile) || {
           id: userObj.id,
           username,
           display_name: username,
           bio: 'Creator on Mikesta.',
           avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
         };
-        const { error: profileError } = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
-        if (profileError) throw profileError;
+        // Keep the trigger's collision-safe username and existing profile fields.
+        if (!provisionedProfile) {
+          const { error: profileError } = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
+          if (profileError) throw profileError;
+        }
         store.switchUser(profile, true);
         onAnnounce('Welcome to Mikesta! You are signed in.');
         onSuccess(profile);

@@ -49,23 +49,51 @@ create table if not exists public.follows (
   check (follower_id <> following_id)
 );
 
--- Create a public profile as soon as a user registers, including when email
--- confirmation is enabled and there is not an active session yet.
+-- Use the same collision-safe allocator for new users and existing accounts.
+-- Retry insertion atomically: concurrent registrations can request the same name.
+create or replace function public.ensure_user_profile(
+  user_id uuid, requested_username text, requested_display_name text
+)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  base_name text := coalesce(nullif(btrim(requested_username), ''), 'user_' || left(user_id::text, 8));
+  candidate text := base_name;
+  attempts integer := 0;
+begin
+  loop
+    insert into public.profiles (id, username, display_name, bio, avatar_url)
+    values (user_id, candidate, requested_display_name, 'Creator on Mikesta.', null)
+    on conflict do nothing;
+
+    -- Preserve existing profiles and return once this user's row exists.
+    if exists (select 1 from public.profiles p where p.id = user_id) then
+      return;
+    end if;
+    attempts := attempts + 1;
+    candidate := base_name || '_' || replace(user_id::text, '-', '')
+      || case when attempts = 1 then '' else '_' || attempts::text end;
+  end loop;
+end;
+$$;
+
+-- This helper is invoked by the auth trigger owner and database migrations only.
+revoke all on function public.ensure_user_profile(uuid, text, text) from public;
+
+-- Create profiles even when registration requires email confirmation.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, username, display_name, bio, avatar_url)
-  values (
+  perform public.ensure_user_profile(
     new.id,
-    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1), 'user_' || left(new.id::text, 8)),
-    coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
-    'Creator on Mikesta.',
-    null
-  )
-  on conflict (id) do nothing;
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'username', split_part(new.email, '@', 1))
+  );
   return new;
 end;
 $$;
@@ -75,18 +103,15 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- Backfill profiles for users created before the trigger was installed.
-insert into public.profiles (id, username, display_name, bio, avatar_url)
-select
+-- Backfill safely when legacy accounts requested identical usernames.
+select public.ensure_user_profile(
   u.id,
-  coalesce(u.raw_user_meta_data->>'username', split_part(u.email, '@', 1), 'user_' || left(u.id::text, 8)),
-  coalesce(u.raw_user_meta_data->>'display_name', u.raw_user_meta_data->>'username', split_part(u.email, '@', 1)),
-  'Creator on Mikesta.',
-  null
+  coalesce(u.raw_user_meta_data->>'username', split_part(u.email, '@', 1)),
+  coalesce(u.raw_user_meta_data->>'display_name', u.raw_user_meta_data->>'username', split_part(u.email, '@', 1))
+)
 from auth.users u
 left join public.profiles p on p.id = u.id
-where p.id is null
-on conflict (id) do nothing;
+where p.id is null;
 
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;

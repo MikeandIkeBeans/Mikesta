@@ -436,6 +436,19 @@ export class MikestaStore {
       ...this.currentUser,
       ...updates,
     };
+    if (this.canSyncWithSupabase()) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: updated.username,
+          display_name: updated.display_name,
+          bio: updated.bio,
+          avatar_url: updated.avatar_url,
+        })
+        .eq('id', updated.id);
+      if (error) throw error;
+    }
+
     this.currentUser = updated;
 
     this.posts = this.posts.map((p) => {
@@ -451,18 +464,6 @@ export class MikestaStore {
       }
       return p;
     });
-
-    if (this.canSyncWithSupabase()) {
-      await supabase
-        .from('profiles')
-        .update({
-          username: updated.username,
-          display_name: updated.display_name,
-          bio: updated.bio,
-          avatar_url: updated.avatar_url,
-        })
-        .eq('id', updated.id);
-    }
 
     this.notify();
     return updated;

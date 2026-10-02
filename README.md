@@ -116,3 +116,17 @@ Mikesta/
         ├── store.ts             # Reactive data store with Supabase sync & offline fallback
         └── supabase.ts          # Typed Supabase client and domain definitions
 ```
+
+## Profile persistence checks
+
+`npm test` covers replacing an uploaded avatar with a preset or URL, visible save
+errors with retry, and preserving the local profile when the remote save fails.
+
+For the username allocator, configure a local `DATABASE_URL` in `.env.local`,
+place the Supabase root certificate at `supabase-ca.crt`, and run `npm run test:db`.
+The test loads the allocator from the migration into the session's temporary
+schema and checks duplicate names, occupied fallback names, repeat backfills,
+and empty names. All fixtures run inside a rolled-back transaction; it does not
+apply the migration or modify existing public/auth tables. PostgreSQL's `psql`
+client is required; for Homebrew libpq, run with
+`PSQL_BIN="$(brew --prefix libpq)/bin/psql" npm run test:db`.
