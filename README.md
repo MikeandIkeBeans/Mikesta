@@ -1,46 +1,147 @@
 # Mikesta
 
-Mikesta is a warm, tactile social photo-sharing app prototype built with semantic HTML, modern CSS, and vanilla JavaScript. It is intentionally small enough to inspect in an interview, but designed with the polish, micro-interactions, and delight of a modern consumer product.
+Mikesta is a responsive social photo-sharing web application built with semantic HTML, CSS, React, and TypeScript. It functions as a complete, resilient social product surface designed for interview code reviews, local evaluation, and Supabase integration.
 
-## Product Features & Vibes
+## Photography tools
 
-- **Vibe & Mood Switcher**: Instant aesthetic theme switching between *Warm Paper* (editorial cream), *Midnight Film* (dark slate), *Golden Hour* (warm amber), and *Nordic Sage* (cool forest), persisted in local storage.
-- **Immersive Stories Viewer**: Instagram/Snapchat-style story viewer featuring segment progress bars, auto-advance timers, tap-to-navigate zones, pause-on-hold, keyboard controls (`←` / `→` / `Space` / `Esc`), floating emoji reaction bursts, and quick replies.
-- **Double-Tap / Double-Click Heart Burst**: Double-clicking any post image triggers a spring-animated heart pop explosion and likes the post.
-- **Creative Atmosphere Filters**: 7 real-time CSS filter presets (*Normal*, *Vintage*, *Golden*, *Noir*, *Cyber*, *Pastel*, *Vivid*) selectable during post creation and preserved across feeds and profiles.
-- **Tactile Web Audio Synthesizer**: Zero-dependency Web Audio API sound effects for likes, reactions, and camera shutter sounds, toggleable from the navbar.
-- **Live Search & Autocomplete**: Search bar with real-time dropdown suggestions for creators, locations, and hashtags.
-- **Inline Commenting**: Instant comment posting directly from feed cards with live previews.
-- **Explore Tag Filter Rail**: Interactive hashtag filter pills (`All`, `Featured`, `Coast`, `Coffee`, `Architecture`, `Nature`) that filter posts smoothly.
-- **Profile Archive & Lightbox**: Creator hero header with editable bio and avatar, dynamic "Moments" vs "Saved" tab collections, and photo lightbox modal inspector.
-- **Mobile Bottom Navigation**: Native app-style fixed bottom navigation bar for mobile devices.
-- **Local State Persistence**: Likes, saves, comments, follow statuses, themes, and created posts persist in `localStorage`.
+Create a post → choose a sample or upload a photo → adjust exposure, contrast,
+warmth, and saturation → share. From any post's Share dialog, choose
+**Download postcard** to export a 1200 × 1500 PNG with the actual caption,
+location, and creator attribution.
 
-## Run locally
+### Engineering decisions to discuss
 
-Open `index.html` or `profile.html` in any modern web browser. No build step, bundler, or dependencies required.
+- **Preview-to-publication consistency:** a shared filter recipe drives CSS preview
+  and Canvas rendering. Edited samples and uploads become JPEG files before they
+  enter the existing storage pipeline, so filters survive reload and sharing.
+- **Bounded image work:** developed photos fit within 1440 × 1440 without
+  upscaling or changing aspect ratio. Blob encoding avoids large base64 strings
+  during editing; preview and download object URLs are released after use.
+- **Explicit failure states:** inaccessible image hosts, export restrictions,
+  unsupported Canvas filters, and encoding failures report an error. Failed
+  edits keep the composer open rather than silently publishing the original.
+- **Honest scope:** warmth is an aesthetic CSS approximation, not RAW white
+  balance. Edits are baked at publication; a future non-destructive editor would
+  retain the original plus its edit recipe. The postcard preserves the full photo
+  and bounds long captions to the print area.
+- **Regression coverage:** tests cover sample-photo edit publication, image
+  dimensions, real postcard metadata, long captions, and failures with retry.
 
-```bash
-open index.html
+The React migration replaces the old static pages and service worker. If a browser
+previously installed the static app, clear that site's old service-worker/cache
+registration before evaluating this version.
+
+## Key Features & Robustness Enhancements
+
+- **Resilient Data Layer & State Store (`src/lib/store.ts`)**:
+  - Automatically loads and hydrates rich seed fixtures so the application is vibrant and interactive out-of-the-box.
+  - Hybrid synchronization with Supabase: reads and writes to Supabase when authenticated, while gracefully falling back to a persistent local state store (`localStorage`) during network interruptions, unconfirmed emails, or missing storage buckets.
+  - One-click demo user switching in the navbar between multiple creator profiles (Elena Rodriguez, Marcus Chen, Maya Lin, Julian Vance).
+- **Feed & Filter System**:
+  - Interactive filter tabs: **Following** (posts from creators you follow), **For you** (engagement-ranked feed), and **Recent** (chronological order).
+  - Hashtag / Topic exploration pills: One-click chips (`All`, `#minimalism`, `#architecture`, `#coffee`, `#ceramics`, `#scandinavia`, `#light`, `#wanderlust`) that dynamically filter feed results.
+  - Interactive captions: Clicking any `#hashtag` within a post caption immediately filters the feed by that tag.
+  - Real-time search filtering across post captions, creator usernames, display names, and locations with instant match feedback and clear-search button.
+- **Post Detail / Lightbox View (`src/components/PostDetailModal.tsx`)**:
+  - Desktop two-column modal showing high-res imagery, author follow status, scrollable comment feed, inline comment composer, and real-time like toggles.
+  - Accessible from post feed expand buttons or clicking any photo in the profile grid.
+- **Stories Rail & Story Viewer (`src/components/StoryViewer.tsx`)**:
+  - Gradient ring avatars with unread/viewed indicators.
+  - Full-screen modal story viewer with an animated progress timer bar, keyboard navigation (Left/Right/Escape), click-zone navigation, and captions.
+  - "Share a story" flow with curated photography presets.
+- **Robust Post Creation Flow (`src/components/UploadDialog.tsx`)**:
+  - Drag-and-drop file upload with preview, file validation, caption input, and location tagging.
+  - Curated sample photo presets for instant testing without needing local image files.
+  - Multi-tier storage fallback: attempts Supabase storage upload, falling back to data URL encoding so post creation never fails due to missing storage buckets or authentication policies.
+  - Optimistic feed insertion and profile archive updates.
+- **Engagement & Social Interactions**:
+  - Double-click / double-tap image heart animation with optimistic like count toggling.
+  - Bookmarks & Saved collection synced to user profile.
+  - Comments panel with inline submission, author comment deletion, and count tracking.
+  - Post options menu (`...` button) for copying links, sharing, unfollowing, and deleting own posts.
+  - Share dialog with clipboard copy and native share API integration.
+  - Suggested creators sidebar with interactive **Follow / Unfollow** buttons that update profile follower counts and the Following feed in real-time.
+- **Notifications Activity Dialog (`src/components/NotificationsDialog.tsx`)**:
+  - Navbar heart icon with an unread badge indicator.
+  - Activity drawer showing likes, comments, follows, and saves with timestamps and "Mark all as read" capability.
+- **Profile Page & Profile Editor (`src/components/EditProfileDialog.tsx`)**:
+  - Profile statistics: posts, followers, following.
+  - Posts tab vs. Saved collection tab.
+  - Dedicated Edit Profile modal supporting custom display names, usernames, bios, and avatar URLs or preset avatars.
+- **Accessibility, Power-User & Offline Support**:
+  - Interactive **Keyboard Shortcuts** modal (press `?` anywhere to view keybindings: `?`, `n`, `t`, `j/k`, `l`, `c`, `s`, `Esc`).
+  - Active **Offline Detection Banner**: informs the user when internet connectivity drops and ensures moments/comments remain safely cached.
+  - Modal scroll-locking (`dialog-open`) and `Escape` key close management across all views.
+  - Responsive layouts from desktop down to mobile screen sizes.
+
+---
+
+## Running Locally
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Start the Vite development server**:
+   ```bash
+   npm run dev
+   ```
+
+3. **Build production bundle**:
+   ```bash
+   npm run build
+   ```
+
+4. **Type check**:
+   ```bash
+   npm run typecheck
+   ```
+
+---
+
+## Database & Supabase Setup
+
+The repository includes both schema migrations and comprehensive seed data:
+
+- **`supabase-schema.sql`**: Creates tables (`profiles`, `posts`, `likes`, `saved_posts`, `comments`, `follows`), row-level security (RLS) policies, and storage setup.
+- **`supabase-seed.sql`**: Comprehensive SQL migration script that:
+  - Ensures the `posts` storage bucket exists and is public.
+  - Seeds confirmed demo users in `auth.users` with password `password123` (`elena@mikesta.com`, `marcus@mikesta.com`, `maya@mikesta.com`, `julian@mikesta.com`).
+  - Populates `public.profiles`, `public.posts`, `public.comments`, `public.likes`, and `public.follows` with aesthetic photography and realistic engagement.
+  - To apply in Supabase: Open the [Supabase SQL Editor](https://supabase.com/dashboard) and run `supabase-seed.sql`.
+
+---
+
+## Project Structure
+
 ```
-
-## Architecture
-
-The client-side state layer in `script.js` is shaped around a future API boundary:
-
-| Client action | Future API shape |
-| --- | --- |
-| Load feed | `GET /api/feed?feed=following&tag=coast` |
-| Create post with filter | `POST /api/posts` with image metadata, filter, and caption |
-| Like or save post | `PUT /api/posts/:postId/reaction` |
-| Add comment | `POST /api/posts/:postId/comments` |
-| Follow creator | `PUT /api/users/:userId/follow` |
-| Load notifications | `GET /api/notifications` |
-| Update profile | `PATCH /api/me` |
-
-## Project Files
-
-- `index.html` - Feed, stories rail, hashtag filters, sidebar, create modal, and mobile nav
-- `profile.html` - Creator profile, stats, post grid, saved collection, and lightbox
-- `styles.css` - Design tokens, themes, responsive layout, animations, and components
-- `script.js` - State engine, theme controller, story viewer, audio synth, and interactions
+Mikesta/
+├── index.html                   # Entry HTML document
+├── package.json                 # Dependencies and scripts (ES module)
+├── styles.css                   # Responsive visual system and modal styling
+├── supabase-schema.sql          # Base database schema & RLS policies
+├── supabase-seed.sql            # Seed SQL migration for Supabase SQL Editor
+├── tsconfig.json                # TypeScript compiler configuration
+├── vite.config.ts               # Vite configuration
+└── src/
+    ├── App.tsx                  # Main application orchestrator & dialog routing
+    ├── main.tsx                 # React DOM mount point
+    ├── components/
+    │   ├── AuthDialog.tsx       # Sign in / Sign up & 1-click demo user switcher
+    │   ├── EditProfileDialog.tsx# Profile details & avatar editor
+    │   ├── FeedPage.tsx         # Stories rail, filter tabs, feed list & sidebar
+    │   ├── Header.tsx           # Navbar, search, notifications badge, user menu
+    │   ├── NotificationsDialog.tsx # Activity feed & mark-as-read
+    │   ├── PostCard.tsx         # Post card with double-tap like, comments, actions
+    │   ├── PostOptionsDialog.tsx# Context menu for posts (copy, delete, unfollow)
+    │   ├── ProfilePage.tsx      # Profile hero, stats, posts/saved tabs
+    │   ├── ShareDialog.tsx      # Social & clipboard share options
+    │   ├── ShareStoryDialog.tsx # Quick ephemeral story creation
+    │   ├── StoryViewer.tsx      # Full-screen story modal with progress timer
+    │   └── UploadDialog.tsx     # Post creation with drag-and-drop & photo presets
+    └── lib/
+        ├── mockData.ts          # Seed profiles, posts, stories, suggestions
+        ├── store.ts             # Reactive data store with Supabase sync & offline fallback
+        └── supabase.ts          # Typed Supabase client and domain definitions
+```
